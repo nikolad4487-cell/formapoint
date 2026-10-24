@@ -1,0 +1,20 @@
+project_id = "formapoint"
+[auth]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173/potvrda-emaila", "http://localhost:5173/reset-lozinke"]
+minimum_password_length = 12
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+[functions.stripe-webhook]
+verify_jwt = false
+[functions.contact]
+verify_jwt = false
+[functions.notify]
+verify_jwt = false
+[functions.checkout]
+verify_jwt = false
+[functions.download]
+verify_jwt = false
+[functions.upload]
+verify_jwt = false

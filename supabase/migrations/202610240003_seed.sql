@@ -1,0 +1,10 @@
+insert into public.service_categories(name,slug)values('Dokumenti','dokumenti'),('Prezentacije','prezentacije'),('Tablice','tablice'),('Administracija','administracija'),('Ostalo','ostalo');
+insert into public.services(slug,name,description,category,icon,popular,included,excluded,sort_order)values
+('word-dokumenti','Word dokumenti','Uredni dokumenti koji ostavljaju profesionalan dojam.','Dokumenti','FileText',true,array['Formatiranje i stilovi','Zaglavlja, sadržaj i tablice','Tehničko uređivanje i priprema za ispis'],array['Neovlašteno pisanje akademskih radova'],1),
+('powerpoint','PowerPoint prezentacije','Vaše ideje, ispričane jasno i vizualno upečatljivo.','Prezentacije','Presentation',true,array['Dizajn slajdova','Uređivanje prezentacija','Animacije i prijelazi'],array['Nedopušten sadržaj'],2),
+('excel','Excel tablice','Pretvorite podatke u pregledne tablice i korisne uvide.','Tablice','Table2',true,array['Organizacija podataka','Osnovne formule i grafikoni','Jednostavni izvještaji'],array['Neugovorene napredne integracije'],3),
+('pdf','PDF dokumenti i obrasci','Od pretvorbe datoteka do obrazaca koji rade za vas.','Dokumenti','Files',false,array['Spajanje i razdvajanje dokumenata','Ispunjivi obrasci','Priprema za ispis'],array['Zaobilaženje zaštite tuđih dokumenata'],4),
+('e-posta','Organizacija e-pošte','Više reda u pretincu. Više vremena za ono bitno.','Administracija','Mail',false,array['Organizacija poruka','Predlošci odgovora','Evidencija upita'],array['Dijeljenje lozinki – pristup samo ovlaštenim OAuth mehanizmom'],5),
+('administracija','Online administracija','Pouzdana podrška svakodnevnim digitalnim zadacima.','Administracija','LayoutGrid',false,array['Unos i organizacija podataka','Održavanje evidencija','Uređivanje dopuštenih sadržaja'],array['Neovlašten pristup sustavima'],6),
+('individualni-zahtjev','Individualni zahtjev','Imate nešto drugo na umu? Pronađimo rješenje zajedno.','Ostalo','Sparkles',false,array['Procjena opsega zadatka','Individualna ponuda','Dogovor roka i isporuke'],array['Nedopušteni zadaci'],7);
+update public.services s set category_id=c.id from public.service_categories c where c.name=s.category;

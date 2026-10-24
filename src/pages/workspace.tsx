@@ -1,0 +1,1890 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import {
+  ArrowRight,
+  Plus,
+  Download,
+  FileText,
+  ShoppingBag,
+  CreditCard,
+  Clock3,
+  Send,
+  Upload,
+  Trash2,
+  CheckCircle2,
+  LockKeyhole,
+} from 'lucide-react';
+import { useAuth } from '../hooks/use-auth';
+import { useRows, useServices } from '../hooks/use-data';
+import { Button } from '../components/ui/button';
+import { ConfirmationDialog } from '../components/ui/dialog';
+import {
+  EmptyState,
+  ErrorState,
+  LoadingSkeleton,
+  OrderCard,
+  PageHeader,
+  SearchInput,
+  ServiceIcon,
+  StatCard,
+  StatusBadge,
+  Unavailable,
+} from '../components/common';
+import { requireDb, rpc, invoke, configured } from '../lib/supabase';
+import type {
+  Order,
+  OrderFile,
+  Message,
+  Payment,
+  Quote,
+  OrderStatus,
+  Service,
+  CartItem,
+} from '../lib/domain';
+import { installments, statuses, transitions } from '../lib/domain';
+import { localDate, money } from '../lib/utils';
+export function QueryState({
+  query,
+  children,
+}: {
+  query: { isPending: boolean; isError: boolean; refetch: () => unknown };
+  children: React.ReactNode;
+}) {
+  if (query.isPending) return <LoadingSkeleton />;
+  if (query.isError) return <ErrorState retry={() => void query.refetch()} />;
+  return <>{children}</>;
+}
+export async function action(fn: () => Promise<unknown>, success = 'Promjene su spremljene.') {
+  try {
+    await fn();
+    toast.success(success);
+    return true;
+  } catch (e) {
+    toast.error(e instanceof Error ? e.message : 'Zahtjev nije uspio.');
+    return false;
+  }
+}
+export function DashboardPage({ admin = false }: { admin?: boolean }) {
+  const { session } = useAuth();
+  const q = useRows<Order>('orders');
+  const payments = useRows<Payment>('payments');
+  const data = q.data || [];
+  const active = data.filter((x) => !['completed', 'cancelled'].includes(x.status));
+  return (
+    <>
+      <PageHeader
+        eyebrow={admin ? 'POSLOVANJE NA JEDNOM MJESTU' : 'VAŠ DIGITALNI RADNI PROSTOR'}
+        title={
+          admin
+            ? 'Pregled poslovanja'
+            : `Dobro došli${session?.user.user_metadata.first_name ? `, ${session.user.user_metadata.first_name}` : ''}.`
+        }
+        description={
+          admin
+            ? 'Pregled narudžbi i potvrđenih naplata.'
+            : 'Sve vaše narudžbe, dogovori i datoteke na jednom mjestu.'
+        }
+        actions={
+          !admin && (
+            <Button asChild>
+              <Link to="/app/nova-narudzba">
+                <Plus size={17} />
+                Nova narudžba
+              </Link>
+            </Button>
+          )
+        }
+      />
+      <QueryState query={q}>
+        <div className="stat-grid">
+          <StatCard label="Aktivne narudžbe" value={active.length} icon={<ShoppingBag />} />
+          <StatCard
+            label="Čekaju uplatu"
+            value={
+              data.filter((x) => ['deposit_pending', 'final_pending'].includes(x.status)).length
+            }
+            icon={<Clock3 />}
+          />
+          <StatCard
+            label="Potvrđeno naplaćeno, nakon povrata"
+            value={money(data.reduce((s, o) => s + o.paid_cents, 0))}
+            icon={<CreditCard />}
+          />
+          <StatCard
+            label="Dovršene narudžbe"
+            value={data.filter((x) => x.status === 'completed').length}
+            icon={<CheckCircle2 />}
+          />
+        </div>
+        <div className="panel">
+          <h2>Nedavne narudžbe</h2>
+          {data.length ? (
+            data.slice(0, 6).map((o) => <OrderCard key={o.id} order={o} admin={admin} />)
+          ) : (
+            <EmptyState
+              title="Vaš radni prostor je spreman"
+              description="Kada pošaljete prvi zahtjev, ovdje ćete pratiti sve dogovore i korake izrade."
+            />
+          )}
+        </div>
+      </QueryState>
+      {admin && (
+        <div className="notice">
+          <LockKeyhole />
+          <p>
+            Prikazan je operativni pregled najviše 200 najnovijih zapisa. Naplate nisu
+            računovodstveni prihod.{' '}
+            {payments.data?.some((p) => p.fee_cents === null)
+              ? 'Za dio transakcija stvarna naknada još nije dostupna.'
+              : ''}
+          </p>
+        </div>
+      )}
+    </>
+  );
+}
+export function OrdersPage({ admin = false }: { admin?: boolean }) {
+  const q = useRows<Order>('orders');
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const [page, setPage] = useState(1);
+  const [view, setView] = useState('cards');
+  const data = (q.data || []).filter(
+    (o) =>
+      (status === 'all' || o.status === status) &&
+      `${o.number} ${o.title}`.toLocaleLowerCase('hr').includes(search.toLocaleLowerCase('hr')),
+  );
+  const shown = data.slice((page - 1) * 10, page * 10);
+  return (
+    <>
+      <PageHeader
+        title={admin ? 'Narudžbe' : 'Moje narudžbe'}
+        description="Pratite dogovore i svaki korak do gotovog rada."
+      />
+      <div className="filter-bar">
+        <SearchInput
+          value={search}
+          onChange={(v) => {
+            setSearch(v);
+            setPage(1);
+          }}
+        />
+        <label>
+          Status
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="all">Sve narudžbe</option>
+            {Object.entries(statuses).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button variant="outline" onClick={() => setView(view === 'cards' ? 'table' : 'cards')}>
+          {view === 'cards' ? 'Tablični prikaz' : 'Kartični prikaz'}
+        </Button>
+      </div>
+      <QueryState query={q}>
+        {shown.length ? (
+          view === 'cards' ? (
+            shown.map((o) => <OrderCard key={o.id} order={o} admin={admin} />)
+          ) : (
+            <div className="panel data-table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Narudžba</th>
+                    <th>Naziv</th>
+                    <th>Status</th>
+                    <th>Cijena</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((o) => (
+                    <tr key={o.id}>
+                      <td>
+                        <Link to={`${admin ? '/admin' : '/app'}/narudzbe/${o.id}`}>{o.number}</Link>
+                      </td>
+                      <td>{o.title}</td>
+                      <td>
+                        <StatusBadge status={o.status} />
+                      </td>
+                      <td>{o.total_cents === null ? 'Prema ponudi' : money(o.total_cents)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          <EmptyState title="Nema narudžbi za odabrani prikaz" />
+        )}
+      </QueryState>
+      <div className="actions">
+        <Button variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+          Prethodna
+        </Button>
+        <span>
+          {page} / {Math.max(1, Math.ceil(data.length / 10))}
+        </span>
+        <Button
+          variant="outline"
+          disabled={page * 10 >= data.length}
+          onClick={() => setPage(page + 1)}
+        >
+          Sljedeća
+        </Button>
+      </div>
+    </>
+  );
+}
+const steps = ['Usluga', 'Detalji', 'Datoteke', 'Rok', 'Opcije', 'Cijena', 'Plaćanje', 'Potvrda'];
+export function NewOrderPage() {
+  const services = useServices();
+  const [params] = useSearchParams();
+  const { session } = useAuth();
+  const key = `fp-draft:${session!.user.id}`;
+  const [draft, setDraft] = useState(() => {
+    try {
+      return (
+        JSON.parse(sessionStorage.getItem(key) || 'null') || {
+          service: params.get('usluga') || '',
+          title: '',
+          description: '',
+          quantity: 1,
+          due: '',
+          model: 'full',
+          promo: '',
+        }
+      );
+    } catch {
+      return {
+        service: '',
+        title: '',
+        description: '',
+        quantity: 1,
+        due: '',
+        model: 'full',
+        promo: '',
+      };
+    }
+  });
+  const [files, setFiles] = useState<File[]>([]);
+  const [step, setStep] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
+  const cache = useQueryClient();
+  const s = services.data?.find((x) => x.slug === draft.service);
+  const total = s?.price_cents == null ? null : s.price_cents * draft.quantity;
+  useEffect(() => {
+    sessionStorage.setItem(key, JSON.stringify(draft));
+  }, [draft, key]);
+  function set(k: string, v: unknown) {
+    setDraft({ ...draft, [k]: v });
+  }
+  function next() {
+    if (step === 0 && !s) {
+      toast.error('Odaberite uslugu.');
+      return;
+    }
+    if (step === 1 && (draft.title.trim().length < 3 || draft.description.trim().length < 10)) {
+      toast.error('Unesite naslov (najmanje 3 znaka) i opis (najmanje 10 znakova).');
+      return;
+    }
+    if (step === 3 && draft.due && new Date(draft.due) <= new Date()) {
+      toast.error('Željeni rok mora biti u budućnosti.');
+      return;
+    }
+    setStep(Math.min(7, step + 1));
+  }
+  async function submit() {
+    if (!s) return;
+    setBusy(true);
+    try {
+      const id = await rpc<string>('create_order', {
+        p_service: s.id,
+        p_quantity: Number(draft.quantity),
+        p_title: draft.title,
+        p_description: draft.description,
+        p_due: draft.due ? new Date(draft.due).toISOString() : null,
+        p_model: draft.model,
+        p_promo: draft.promo || null,
+      });
+      sessionStorage.removeItem(key);
+      let failed = 0;
+      for (const file of files) {
+        const form = new FormData();
+        form.set('order_id', id);
+        form.set('file', file);
+        const { error } = await requireDb().functions.invoke('upload', { body: form });
+        if (error) failed++;
+      }
+      await cache.invalidateQueries({ queryKey: ['orders'] });
+      if (failed)
+        toast.error(
+          'Narudžba je kreirana, ali dio datoteka nije prenesen. Dodajte ih u detaljima narudžbe.',
+        );
+      else toast.success('Narudžba je zaprimljena.');
+      navigate(`/app/narudzbe/${id}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Narudžba nije kreirana.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <PageHeader
+        title="Nova narudžba"
+        description="Recite nam što trebate. Dogovor počinje jasnim uputama."
+      />
+      <nav className="wizard-steps" aria-label="Koraci narudžbe">
+        {steps.map((t, i) => (
+          <span
+            key={t}
+            className={i === step ? 'active' : ''}
+            aria-current={i === step ? 'step' : undefined}
+          >
+            {i + 1}. {t}
+          </span>
+        ))}
+      </nav>
+      <div className="panel">
+        <h2>{steps[step]}</h2>
+        {step === 0 && (
+          <QueryState query={services}>
+            <div className="stack">
+              {services.data?.map((x) => (
+                <button
+                  key={x.id}
+                  onClick={() =>
+                    setDraft({ ...draft, service: x.slug, model: 'full', quantity: 1 })
+                  }
+                  className={`select-card ${s?.id === x.id ? 'selected' : ''}`}
+                >
+                  <span className="service-icon">
+                    <ServiceIcon name={x.icon} />
+                  </span>
+                  <div>
+                    <h3>{x.name}</h3>
+                    <p>{x.price_cents === null ? 'Prema ponudi' : money(x.price_cents)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </QueryState>
+        )}
+        {step === 1 && (
+          <div className="stack">
+            <label>
+              Naslov zadatka
+              <input
+                value={draft.title}
+                maxLength={150}
+                onChange={(e) => set('title', e.target.value)}
+              />
+            </label>
+            <label>
+              Detaljne upute
+              <textarea
+                value={draft.description}
+                maxLength={10000}
+                onChange={(e) => set('description', e.target.value)}
+                placeholder="Opišite opseg, željeni rezultat i važne napomene."
+              />
+            </label>
+          </div>
+        )}
+        {step === 2 && (
+          <>
+            <FilePicker files={files} setFiles={setFiles} />
+            <p>
+              Datoteke se prenose nakon potvrde narudžbe i čekaju sigurnosnu provjeru. Nacrt ne čuva
+              odabrane datoteke nakon zatvaranja stranice.
+            </p>
+          </>
+        )}
+        {step === 3 && (
+          <>
+            <label>
+              Željeni rok (neobvezno)
+              <input
+                type="datetime-local"
+                value={draft.due}
+                onChange={(e) => set('due', e.target.value)}
+              />
+            </label>
+            <p>Konačni rok potvrđuje se ponudom. Unesite svoje lokalno vrijeme.</p>
+          </>
+        )}
+        {step === 4 && (
+          <>
+            <label>
+              Količina
+              <input
+                type="number"
+                min="1"
+                max="100"
+                value={draft.quantity}
+                onChange={(e) =>
+                  set('quantity', Math.min(100, Math.max(1, Number(e.target.value))))
+                }
+              />
+            </label>
+            <p>U ovoj verziji opseg i dodatne opcije dogovaraju se kroz opis i ponudu.</p>
+          </>
+        )}
+        {step === 5 && (
+          <>
+            <StatCard
+              label="Informativna cijena prije kupona"
+              value={total === null ? 'Prema ponudi' : money(total)}
+            />
+            {total !== null && (
+              <label>
+                Promo kod (neobvezno)
+                <input
+                  value={draft.promo}
+                  onChange={(e) => set('promo', e.target.value.toUpperCase())}
+                />
+              </label>
+            )}
+            <p>
+              Konačni iznos izračunava poslužitelj pri kreiranju. Kupon se provjerava na
+              poslužitelju; nevažeći kod zaustavlja narudžbu.
+            </p>
+          </>
+        )}
+        {step === 6 && (
+          <>
+            <label>
+              Model plaćanja
+              <select value={draft.model} onChange={(e) => set('model', e.target.value)}>
+                <option value="full">100 % unaprijed</option>
+                {s?.split_enabled && total !== null && total >= s.split_min_cents && (
+                  <option value="split">50/50</option>
+                )}
+              </select>
+            </label>
+            {total !== null && (
+              <div className="notice">
+                <CreditCard />
+                <p>
+                  {installments(total, draft.model === 'split')
+                    .map((x, i) => `${i + 1}. uplata: ${money(x)}`)
+                    .join(' · ')}
+                  . Iznosi su informativni prije provjere kupona.
+                </p>
+              </div>
+            )}
+            {total === null && (
+              <p>Model plaćanja potvrđujete tek pri prihvaćanju individualne ponude.</p>
+            )}
+          </>
+        )}
+        {step === 7 && (
+          <div className="stack">
+            <h3>{draft.title}</h3>
+            <p>
+              {s?.name} · {draft.quantity} ×
+            </p>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{draft.description}</p>
+            <p>
+              {total === null
+                ? 'Cijena i uvjeti nakon individualne ponude.'
+                : `Informativno ${money(total)} prije kupona.`}
+            </p>
+            <p>Datoteke: {files.length}. Slanjem se ne izvršava uplata.</p>
+          </div>
+        )}
+        <div className="actions">
+          <Button variant="outline" disabled={step === 0 || busy} onClick={() => setStep(step - 1)}>
+            Natrag
+          </Button>
+          {step < 7 ? (
+            <Button onClick={next}>
+              Nastavi <ArrowRight size={16} />
+            </Button>
+          ) : (
+            <Button onClick={() => void submit()} disabled={busy}>
+              {busy ? 'Slanje…' : 'Potvrdi narudžbu'}
+            </Button>
+          )}
+        </div>
+      </div>
+      <small>Nacrt se čuva samo u ovoj sesiji preglednika.</small>
+    </>
+  );
+}
+export function FilePicker({ files, setFiles }: { files: File[]; setFiles: (f: File[]) => void }) {
+  return (
+    <label>
+      Dodaj datoteke · do 20 MB po datoteci
+      <input
+        type="file"
+        multiple
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png"
+        onChange={(e) => {
+          const list = Array.from(e.target.files || []);
+          if (list.length > 10 || list.some((f) => f.size > 20 * 1024 * 1024)) {
+            toast.error('Najviše 10 datoteka, svaka do 20 MB.');
+            return;
+          }
+          setFiles(list);
+        }}
+      />
+      <span>{files.map((f) => f.name).join(', ')}</span>
+    </label>
+  );
+}
+export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
+  const { id } = useParams();
+  const q = useRows<Order>('orders', { id: id! });
+  const quotes = useRows<Quote>('quotes', { order_id: id! });
+  const history = useRows<{ id: string; status: string; created_at: string }>(
+    'order_status_history',
+    { order_id: id! },
+  );
+  const cache = useQueryClient();
+  const [model, setModel] = useState('full');
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<OrderStatus | null>(null);
+  const order = q.data?.[0];
+  async function pay() {
+    setBusy(true);
+    await action(async () => {
+      const { url } = await invoke<{ url: string }>('checkout', { order_id: id });
+      if (!url.startsWith('https://checkout.stripe.com/'))
+        throw new Error('Neočekivana adresa naplate.');
+      window.location.assign(url);
+    }, 'Otvaranje sigurne naplate…');
+    setBusy(false);
+  }
+  return (
+    <QueryState query={q}>
+      {!order ? (
+        <EmptyState title="Narudžba nije pronađena" />
+      ) : (
+        <>
+          <PageHeader
+            eyebrow={order.number}
+            title={order.title}
+            description={`Kreirano ${localDate(order.created_at)}`}
+            actions={<StatusBadge status={order.status} />}
+          />
+          <div className="stat-grid">
+            <StatCard
+              label="Dogovoreni iznos"
+              value={order.total_cents === null ? 'Prema ponudi' : money(order.total_cents)}
+            />
+            <StatCard label="Potvrđeno uplaćeno" value={money(order.paid_cents)} />
+            <StatCard
+              label="Preostalo"
+              value={
+                order.total_cents === null
+                  ? 'Čeka ponudu'
+                  : money(Math.max(0, order.total_cents - order.paid_cents))
+              }
+            />
+            <StatCard
+              label="Model plaćanja"
+              value={order.payment_model === 'split' ? '50/50' : '100 %'}
+            />
+          </div>
+          <div className="panel">
+            <h2>Upute za izradu</h2>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{order.description}</p>
+            {order.due_at && <p>Željeni / dogovoreni rok: {localDate(order.due_at)}</p>}
+            {!admin && ['deposit_pending', 'final_pending'].includes(order.status) && (
+              <PaymentAction busy={busy} pay={() => void pay()} />
+            )}
+            <div className="actions">
+              {admin &&
+                transitions[order.status].map((s) => (
+                  <Button variant="outline" key={s} onClick={() => setConfirm(s)}>
+                    {statuses[s]}
+                  </Button>
+                ))}
+              {admin && ['received', 'quote_pending', 'quote_sent'].includes(order.status) && (
+                <Button onClick={() => setQuoteOpen(true)}>Izradi ponudu</Button>
+              )}
+            </div>
+          </div>
+          <QueryState query={quotes}>
+            {quotes.data?.map((quote, index) => (
+              <div className="panel" key={quote.id}>
+                <span className="eyebrow">PONUDA · VERZIJA {quote.version}</span>
+                <h2>{money(quote.total_cents)}</h2>
+                <p style={{ whiteSpace: 'pre-wrap' }}>{quote.description}</p>
+                <p>Vrijedi do {localDate(quote.expires_at)}</p>
+                {quote.accepted_at ? (
+                  <StatusBadge status="ready" />
+                ) : (
+                  !admin &&
+                  index === 0 &&
+                  order.status === 'quote_sent' &&
+                  new Date(quote.expires_at) > new Date() && (
+                    <>
+                      <label>
+                        Model plaćanja
+                        <select value={model} onChange={(e) => setModel(e.target.value)}>
+                          <option value="full">100 %</option>
+                          {quote.split_enabled && <option value="split">50/50</option>}
+                        </select>
+                      </label>
+                      <div className="actions">
+                        <Button
+                          onClick={() =>
+                            void action(async () => {
+                              await rpc('accept_quote', { p_quote: quote.id, p_model: model });
+                              await cache.invalidateQueries();
+                            })
+                          }
+                        >
+                          Prihvati ponudu
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            void action(async () => {
+                              await rpc('reject_quote', { p_quote: quote.id });
+                              await cache.invalidateQueries();
+                            })
+                          }
+                        >
+                          Odbij ponudu
+                        </Button>
+                      </div>
+                    </>
+                  )
+                )}
+              </div>
+            ))}
+          </QueryState>
+          <div className="split-columns">
+            <div>
+              <OrderFiles orderId={id!} admin={admin} />
+              <div className="panel">
+                <h2>Vremenska crta</h2>
+                <QueryState query={history}>
+                  <ol className="timeline">
+                    {history.data?.map((h) => (
+                      <li key={h.id}>
+                        <p>{statuses[h.status as OrderStatus]}</p>
+                        <small>{localDate(h.created_at)}</small>
+                      </li>
+                    ))}
+                  </ol>
+                </QueryState>
+              </div>
+            </div>
+            <ConversationPanel orderId={id!} admin={admin} />
+          </div>
+          <ConfirmationDialog
+            open={!!confirm}
+            onOpenChange={() => setConfirm(null)}
+            title="Promjena statusa"
+          >
+            <p>Promijeniti status u „{confirm && statuses[confirm]}”?</p>
+            <Button
+              onClick={() =>
+                void action(async () => {
+                  await rpc('transition_order', { p_order: id, p_status: confirm });
+                  setConfirm(null);
+                  await cache.invalidateQueries();
+                })
+              }
+            >
+              Potvrdi
+            </Button>
+          </ConfirmationDialog>
+          <ConfirmationDialog
+            open={quoteOpen}
+            onOpenChange={setQuoteOpen}
+            title="Nova verzija ponude"
+          >
+            <QuoteForm orderId={id!} done={() => setQuoteOpen(false)} />
+          </ConfirmationDialog>
+        </>
+      )}
+    </QueryState>
+  );
+}
+function PaymentAction({ busy, pay }: { busy: boolean; pay: () => void }) {
+  const q = useRows<{ stripe_enabled: boolean; maintenance: boolean }>('site_settings');
+  const enabled = q.data?.[0]?.stripe_enabled && !q.data?.[0]?.maintenance;
+  return (
+    <div className="notice">
+      <CreditCard />
+      <div>
+        <p>
+          {enabled
+            ? 'Plaćanje se provodi na službenoj Stripe Checkout stranici. Povratak na ovu stranicu ne potvrđuje uplatu.'
+            : 'Online plaćanje trenutačno nije aktivirano. Nije izvršena nikakva naplata.'}
+        </p>
+        {enabled && (
+          <Button disabled={busy} onClick={pay}>
+            {busy ? 'Otvaranje…' : 'Plati putem Stripea'}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+function QuoteForm({ orderId, done }: { orderId: string; done: () => void }) {
+  const cache = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        setBusy(true);
+        const ok = await action(async () => {
+          await rpc('create_quote', {
+            p_order: orderId,
+            p_description: f.get('description'),
+            p_total: Number(f.get('cents')),
+            p_expires: new Date(String(f.get('expires'))).toISOString(),
+            p_due: new Date(String(f.get('due'))).toISOString(),
+            p_split: f.get('split') === 'on',
+          });
+          await cache.invalidateQueries();
+        });
+        setBusy(false);
+        if (ok) done();
+      }}
+    >
+      <label>
+        Opis i uvjeti
+        <textarea name="description" required minLength={10} maxLength={10000} />
+      </label>
+      <label>
+        Konačna cijena u centima
+        <input name="cents" type="number" min={100} max={100000000} required />
+      </label>
+      <label>
+        Vrijedi do
+        <input type="datetime-local" name="expires" required />
+      </label>
+      <label>
+        Rok isporuke
+        <input type="datetime-local" name="due" required />
+      </label>
+      <label className="checkbox">
+        <input name="split" type="checkbox" />
+        Omogući 50/50
+      </label>
+      <Button disabled={busy}>Spremi i pošalji ponudu</Button>
+    </form>
+  );
+}
+export function ConversationPanel({
+  orderId,
+  admin = false,
+}: {
+  orderId: string;
+  admin?: boolean;
+}) {
+  const q = useRows<Message>('order_messages', { order_id: orderId });
+  const { session } = useAuth();
+  const [body, setBody] = useState('');
+  const [internal, setInternal] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const cache = useQueryClient();
+  useEffect(() => {
+    const db = requireDb();
+    const channel = db
+      .channel(`messages:${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'order_messages',
+          filter: `order_id=eq.${orderId}`,
+        },
+        () => {
+          void cache.invalidateQueries({ queryKey: ['order_messages'] });
+        },
+      )
+      .subscribe();
+    return () => {
+      void db.removeChannel(channel);
+    };
+  }, [orderId, cache]);
+  return (
+    <section className="panel">
+      <h2>Razgovor o narudžbi</h2>
+      <QueryState query={q}>
+        {q.data?.length ? (
+          [...q.data].reverse().map((m) => (
+            <article
+              key={m.id}
+              className={`message ${m.sender_id === session?.user.id ? 'mine' : ''} ${m.internal ? 'internal' : ''}`}
+            >
+              <p>{m.body}</p>
+              <small>
+                {m.internal ? 'Interna bilješka · ' : ''}
+                {localDate(m.created_at)}
+              </small>
+            </article>
+          ))
+        ) : (
+          <EmptyState
+            title="Započnite razgovor"
+            description="Sve upute i dogovori ostaju povezani s narudžbom."
+          />
+        )}
+      </QueryState>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          const ok = await action(async () => {
+            await rpc('send_message', { p_order: orderId, p_body: body, p_internal: internal });
+            await cache.invalidateQueries({ queryKey: ['order_messages'] });
+          }, 'Poruka je poslana.');
+          if (ok) setBody('');
+          setBusy(false);
+        }}
+      >
+        <label>
+          Vaša poruka
+          <textarea
+            required
+            minLength={1}
+            maxLength={5000}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </label>
+        {admin && (
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={internal}
+              onChange={(e) => setInternal(e.target.checked)}
+            />
+            Interna bilješka, vidljiva samo administraciji
+          </label>
+        )}
+        <Button disabled={busy || !body.trim()}>
+          <Send size={15} />
+          Pošalji
+        </Button>
+      </form>
+    </section>
+  );
+}
+export function OrderFiles({ orderId, admin = false }: { orderId: string; admin?: boolean }) {
+  const q = useRows<OrderFile>('order_files', { order_id: orderId });
+  const [files, setFiles] = useState<File[]>([]);
+  const [kind, setKind] = useState('attachment');
+  const [busy, setBusy] = useState(false);
+  const cache = useQueryClient();
+  return (
+    <section className="panel">
+      <h2>Datoteke narudžbe</h2>
+      <QueryState query={q}>
+        {q.data?.length ? (
+          q.data.map((f) => <FileRow key={f.id} file={f} />)
+        ) : (
+          <EmptyState title="Još nema datoteka" />
+        )}
+      </QueryState>
+      <FilePicker files={files} setFiles={setFiles} />
+      {admin && (
+        <label>
+          Vrsta
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="attachment">Privitak</option>
+            <option value="preview">Pregled rada</option>
+            <option value="final">Završni rad</option>
+          </select>
+        </label>
+      )}
+      <Button
+        className="actions"
+        variant="outline"
+        disabled={busy || !files.length}
+        onClick={async () => {
+          setBusy(true);
+          const ok = await action(async () => {
+            for (const file of files) {
+              const form = new FormData();
+              form.set('file', file);
+              form.set('order_id', orderId);
+              form.set('kind', kind);
+              const { error } = await requireDb().functions.invoke('upload', { body: form });
+              if (error)
+                throw new Error(
+                  'Prijenos nije uspio. Već prenesene datoteke prikazane su nakon osvježavanja.',
+                );
+            }
+            await cache.invalidateQueries({ queryKey: ['order_files'] });
+          }, 'Datoteke čekaju sigurnosnu provjeru.');
+          if (ok) setFiles([]);
+          else await cache.invalidateQueries({ queryKey: ['order_files'] });
+          setBusy(false);
+        }}
+      >
+        <Upload size={15} />
+        Prenesi datoteke
+      </Button>
+      <small>
+        Datoteke su privatne. Preuzimanje je moguće tek nakon sigurnosne provjere i provjere uplate
+        za završni rad.
+      </small>
+    </section>
+  );
+}
+function FileRow({ file }: { file: OrderFile }) {
+  const { role } = useAuth();
+  const cache = useQueryClient();
+  const [review, setReview] = useState(false);
+  const [reason, setReason] = useState('');
+  const [status, setStatus] = useState('clean');
+  return (
+    <div className="file-row">
+      <div>
+        <strong>{file.name}</strong>
+        <small>
+          {Math.ceil(file.size / 1024)} KB ·{' '}
+          {file.kind === 'final' ? 'Završni rad' : file.kind === 'preview' ? 'Pregled' : 'Privitak'}{' '}
+          · {localDate(file.created_at)}
+        </small>
+        <StatusBadge status={file.scan_status} />
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={file.scan_status !== 'clean'}
+        onClick={() =>
+          void action(async () => {
+            const result = await invoke<{ url: string }>('download', { file_id: file.id });
+            const url = new URL(result.url);
+            if (
+              url.protocol !== 'https:' &&
+              url.hostname !== 'localhost' &&
+              url.hostname !== '127.0.0.1'
+            )
+              throw new Error('Neispravna adresa.');
+            window.open(result.url, '_blank', 'noopener,noreferrer');
+          }, 'Preuzimanje je odobreno.')
+        }
+      >
+        <Download size={14} />
+        Preuzmi
+      </Button>
+      {role === 'ADMIN' && (
+        <>
+          <Button variant="ghost" size="sm" onClick={() => setReview(true)}>
+            Sigurnosna provjera
+          </Button>
+          <ConfirmationDialog
+            open={review}
+            onOpenChange={setReview}
+            title="Evidentiraj sigurnosnu provjeru"
+          >
+            <p>
+              Automatski antivirus nije povezan. Označite datoteku sigurnom tek nakon stvarne
+              provjere odgovarajućim alatom.
+            </p>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                await action(async () => {
+                  await rpc('mark_file_scanned', {
+                    p_file: file.id,
+                    p_status: status,
+                    p_reason: reason,
+                  });
+                  setReview(false);
+                  await cache.invalidateQueries({ queryKey: ['order_files'] });
+                });
+              }}
+            >
+              <label>
+                Rezultat
+                <select value={status} onChange={(e) => setStatus(e.target.value)}>
+                  <option value="clean">Provjereno i dopušteno</option>
+                  <option value="rejected">Odbijeno</option>
+                </select>
+              </label>
+              <label>
+                Alat, rezultat i obrazloženje
+                <textarea
+                  required
+                  minLength={10}
+                  maxLength={500}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </label>
+              <Button>Spremi u audit zapis</Button>
+            </form>
+          </ConfirmationDialog>
+        </>
+      )}
+    </div>
+  );
+}
+export function FilesPage() {
+  const q = useRows<OrderFile>('order_files');
+  return (
+    <>
+      <PageHeader
+        title="Datoteke"
+        description="Vaši privatni privici, pregledi i završni radovi."
+      />
+      <div className="panel">
+        <QueryState query={q}>
+          {q.data?.length ? (
+            q.data.map((f) => <FileRow key={f.id} file={f} />)
+          ) : (
+            <EmptyState
+              title="Još nema datoteka"
+              description="Datoteke dodajete unutar pojedine narudžbe."
+            />
+          )}
+        </QueryState>
+      </div>
+    </>
+  );
+}
+export function CartPage() {
+  const cache = useQueryClient();
+  const q = useQuery({
+    queryKey: ['cart'],
+    queryFn: async () => {
+      const { data, error } = await requireDb().from('cart_items').select('*,services(*)');
+      if (error) throw error;
+      return data as CartItem[];
+    },
+  });
+  const services = useServices();
+  const [model, setModel] = useState('full');
+  const [description, setDescription] = useState('');
+  const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
+  const total = (q.data || []).reduce((n, i) => n + (i.services?.price_cents || 0) * i.quantity, 0);
+  const split =
+    !!q.data?.length &&
+    q.data.every(
+      (i) =>
+        i.services?.split_enabled &&
+        (i.services?.price_cents || 0) * i.quantity >= (i.services?.split_min_cents || 0),
+    );
+  return (
+    <>
+      <PageHeader
+        title="Košarica"
+        description="Stavke se čuvaju u vašem računu. Svaka stavka postaje zasebna narudžba i zasebna naplata."
+      />
+      <QueryState query={q}>
+        <div className="panel">
+          {q.data?.length ? (
+            q.data.map((i) => (
+              <div className="file-row" key={i.id}>
+                <div>
+                  <h3>{i.services?.name || 'Nedostupna usluga'}</h3>
+                  <p>{money((i.services?.price_cents || 0) * i.quantity)}</p>
+                </div>
+                <label>
+                  Količina
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={i.quantity}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (n >= 1 && n <= 100)
+                        void action(async () => {
+                          await rpc('cart_set', { p_service: i.service_id, p_quantity: n });
+                          await cache.invalidateQueries({ queryKey: ['cart'] });
+                        });
+                    }}
+                  />
+                </label>
+                <Button
+                  variant="ghost"
+                  aria-label={`Ukloni ${i.services?.name || 'Nedostupna usluga'}`}
+                  onClick={() =>
+                    void action(async () => {
+                      await rpc('cart_set', { p_service: i.service_id, p_quantity: 0 });
+                      await cache.invalidateQueries({ queryKey: ['cart'] });
+                    })
+                  }
+                >
+                  <Trash2 size={17} />
+                </Button>
+              </div>
+            ))
+          ) : (
+            <EmptyState
+              title="Košarica je prazna"
+              description="U košaricu možete dodati samo usluge s definiranim cjenikom."
+            />
+          )}
+        </div>
+      </QueryState>
+      <div className="panel">
+        <h2>Dodaj uslugu</h2>
+        <QueryState query={services}>
+          {services.data?.some((s) => s.price_cents !== null) ? (
+            services.data
+              .filter((s) => s.price_cents !== null)
+              .map((s) => (
+                <div className="file-row" key={s.id}>
+                  <span>
+                    {s.name} · {money(s.price_cents!)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void action(async () => {
+                        const item = q.data?.find((x) => x.service_id === s.id);
+                        await rpc('cart_set', {
+                          p_service: s.id,
+                          p_quantity: (item?.quantity || 0) + 1,
+                        });
+                        await cache.invalidateQueries({ queryKey: ['cart'] });
+                      })
+                    }
+                  >
+                    <Plus size={16} />
+                    Dodaj
+                  </Button>
+                </div>
+              ))
+          ) : (
+            <p>
+              Trenutačno se sve usluge ugovaraju individualnom ponudom.{' '}
+              <Link className="text-link" to="/app/nova-narudzba">
+                Pošalji zahtjev
+              </Link>
+            </p>
+          )}
+        </QueryState>
+      </div>
+      {!!q.data?.length && (
+        <form
+          className="panel"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            const ok = await action(async () => {
+              await rpc('checkout_cart', { p_description: description, p_model: model });
+              await cache.invalidateQueries();
+              navigate('/app/narudzbe');
+            }, 'Narudžbe su kreirane. Otvorite pojedinu narudžbu za plaćanje.');
+            if (!ok) setBusy(false);
+          }}
+        >
+          <h2>Ukupno informativno: {money(total)}</h2>
+          <label>
+            Upute za narudžbe
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              minLength={10}
+              required
+            />
+          </label>
+          <label>
+            Model
+            <select value={model} onChange={(e) => setModel(e.target.value)}>
+              <option value="full">100 %</option>
+              {split && <option value="split">50/50</option>}
+            </select>
+          </label>
+          <p>
+            Konačne cijene provjeravaju se na poslužitelju. Ova radnja kreira narudžbe bez naplate.
+            Promo kod za pojedinačnu narudžbu unesite u obrazac nove narudžbe.
+          </p>
+          <Button disabled={busy}>Kreiraj narudžbe</Button>
+        </form>
+      )}
+    </>
+  );
+}
+export function PaymentsPage({ admin = false }: { admin?: boolean }) {
+  const q = useRows<Payment>('payments');
+  const [search, setSearch] = useState('');
+  const rows = (q.data || []).filter((p) =>
+    `${p.status} ${p.provider} ${p.order_id}`.includes(search),
+  );
+  function csv() {
+    const cell = (v: unknown) =>
+      `"${String(v ?? '')
+        .replace(/"/g, '""')
+        .replace(/^[=+@-]/, "'$&")}"`;
+    const text =
+      '\uFEFF' +
+      [
+        [
+          'ID',
+          'Narudžba',
+          'Bruto centi',
+          'Refundirano centi',
+          'Naknada centi',
+          'Status',
+          'Pružatelj',
+          'Vrijeme',
+        ],
+        ...rows.map((p) => [
+          p.id,
+          p.order_id,
+          p.amount_cents,
+          p.refunded_cents,
+          p.fee_cents,
+          p.status,
+          p.provider,
+          p.created_at,
+        ]),
+      ]
+        .map((r) => r.map(cell).join(';'))
+        .join('\r\n');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'formapoint-transakcije.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  return (
+    <>
+      <PageHeader
+        title="Plaćanja"
+        description="Potvrđene transakcije, povrati i stvarne naknade pružatelja."
+        actions={
+          admin && (
+            <Button variant="outline" onClick={csv}>
+              <Download size={16} />
+              Izvoz CSV
+            </Button>
+          )
+        }
+      />
+      <SearchInput
+        value={search}
+        onChange={setSearch}
+        placeholder="Filtriraj status, narudžbu ili pružatelja"
+      />
+      <div className="panel">
+        <QueryState query={q}>
+          {rows.length ? (
+            <div className="data-table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Narudžba</th>
+                    <th>Bruto</th>
+                    <th>Povrat</th>
+                    <th>Naknada</th>
+                    <th>Neto nakon naknade i povrata</th>
+                    <th>Status</th>
+                    <th>Datum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <Link to={`${admin ? '/admin' : '/app'}/narudzbe/${p.order_id}`}>
+                          {p.order_id.slice(0, 8)} · {p.provider}
+                        </Link>
+                      </td>
+                      <td>{money(p.amount_cents)}</td>
+                      <td>{money(p.refunded_cents)}</td>
+                      <td>{p.fee_cents === null ? 'Nije dostupna' : money(p.fee_cents)}</td>
+                      <td>
+                        {p.fee_cents === null
+                          ? 'Nije dostupno'
+                          : money(p.amount_cents - p.refunded_cents - p.fee_cents)}
+                      </td>
+                      <td>
+                        <StatusBadge status={p.status} />
+                      </td>
+                      <td>{localDate(p.created_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              title="Nema transakcija"
+              description="Ovdje se prikazuju stvarne evidentirane transakcije. Povratak s naplate sam po sebi ne potvrđuje uplatu."
+            />
+          )}
+        </QueryState>
+      </div>
+    </>
+  );
+}
+export function NotificationsPage() {
+  const q = useRows<{
+    id: string;
+    title: string;
+    body: string;
+    read_at: string | null;
+    created_at: string;
+  }>('notifications');
+  const cache = useQueryClient();
+  return (
+    <>
+      <PageHeader title="Obavijesti" />
+      <QueryState query={q}>
+        {q.data?.length ? (
+          q.data.map((n) => (
+            <article className="panel" key={n.id}>
+              <h3>{n.title}</h3>
+              <p>{n.body}</p>
+              <small>{localDate(n.created_at)}</small>
+              {!n.read_at && (
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    void action(async () => {
+                      const { error } = await requireDb()
+                        .from('notifications')
+                        .update({ read_at: new Date().toISOString() })
+                        .eq('id', n.id);
+                      if (error) throw error;
+                      await cache.invalidateQueries({ queryKey: ['notifications'] });
+                    })
+                  }
+                >
+                  Označi kao pročitano
+                </Button>
+              )}
+            </article>
+          ))
+        ) : (
+          <EmptyState
+            title="Sve je pod kontrolom"
+            description="Trenutačno nema novih obavijesti."
+          />
+        )}
+      </QueryState>
+    </>
+  );
+}
+export function ProfilePage() {
+  const { session } = useAuth();
+  const q = useRows<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    phone: string | null;
+    marketing_consent: boolean;
+  }>('profiles', { id: session!.user.id });
+  const cache = useQueryClient();
+  return (
+    <>
+      <PageHeader title="Moj profil" />
+      <QueryState query={q}>
+        {q.data?.[0] && (
+          <form
+            className="panel"
+            key={q.data[0].id}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              await action(async () => {
+                const { error } = await requireDb()
+                  .from('profiles')
+                  .update({
+                    first_name: String(f.get('first')).trim(),
+                    last_name: String(f.get('last')).trim(),
+                    phone: String(f.get('phone')).trim() || null,
+                    marketing_consent: f.get('marketing') === 'on',
+                  })
+                  .eq('id', session!.user.id);
+                if (error) throw error;
+                await cache.invalidateQueries({ queryKey: ['profiles'] });
+              });
+            }}
+          >
+            <div className="form-row">
+              <label>
+                Ime
+                <input name="first" required maxLength={150} defaultValue={q.data[0].first_name} />
+              </label>
+              <label>
+                Prezime
+                <input name="last" required maxLength={150} defaultValue={q.data[0].last_name} />
+              </label>
+            </div>
+            <label>
+              Telefon
+              <input name="phone" type="tel" maxLength={40} defaultValue={q.data[0].phone || ''} />
+            </label>
+            <label className="checkbox">
+              <input
+                name="marketing"
+                type="checkbox"
+                defaultChecked={q.data[0].marketing_consent}
+              />
+              Želim novosti i ponude.
+            </label>
+            <Button>Spremi profil</Button>
+          </form>
+        )}
+      </QueryState>
+      <div className="panel">
+        <h2>Sigurnost i osobni podaci</h2>
+        <p>E-mail računa: {session?.user.email}</p>
+        <div className="actions">
+          <Button asChild variant="outline">
+            <Link to="/zaboravljena-lozinka">Promijeni lozinku putem e-pošte</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/app/podrska">Zatraži izvoz ili brisanje podataka</Link>
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+}
+export function SettingsPage() {
+  const { session } = useAuth();
+  const q = useRows<{ user_id: string; email_enabled: boolean }>('notification_preferences', {
+    user_id: session!.user.id,
+  });
+  const cache = useQueryClient();
+  return (
+    <>
+      <PageHeader title="Postavke" description="Upravljajte e-mail obavijestima." />
+      <QueryState query={q}>
+        <div className="panel">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={q.data?.[0]?.email_enabled ?? true}
+              onChange={(e) =>
+                void action(async () => {
+                  const { error } = await requireDb()
+                    .from('notification_preferences')
+                    .upsert({ user_id: session!.user.id, email_enabled: e.target.checked });
+                  if (error) throw error;
+                  await cache.invalidateQueries({ queryKey: ['notification_preferences'] });
+                })
+              }
+            />
+            Želim primati obavijesti o narudžbama putem e-pošte.
+          </label>
+          <p>Sigurnosne poruke i potvrde prijave šalje Supabase Auth neovisno o ovoj postavci.</p>
+        </div>
+      </QueryState>
+    </>
+  );
+}
+export function SupportPage({ admin = false }: { admin?: boolean }) {
+  const q = useRows<{
+    id: string;
+    subject: string;
+    category: string;
+    body: string;
+    status: string;
+    created_at: string;
+  }>('support_tickets');
+  const [selected, setSelected] = useState('');
+  const cache = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  return (
+    <>
+      <PageHeader
+        title="Podrška"
+        description="Pošaljite upit ili pratite odgovore na postojeće zahtjeve."
+      />
+      {!admin && (
+        <form
+          className="panel"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const form = e.currentTarget;
+            const f = new FormData(form);
+            setBusy(true);
+            const ok = await action(async () => {
+              await rpc('open_ticket', {
+                p_subject: f.get('subject'),
+                p_category: f.get('category'),
+                p_body: f.get('body'),
+              });
+              await cache.invalidateQueries({ queryKey: ['support_tickets'] });
+            }, 'Zahtjev je zaprimljen.');
+            setBusy(false);
+            if (ok) form.reset();
+          }}
+        >
+          <label>
+            Predmet
+            <input name="subject" minLength={3} maxLength={150} required />
+          </label>
+          <label>
+            Kategorija
+            <select name="category">
+              {[
+                'Narudžbe',
+                'Plaćanja',
+                'Datoteke',
+                'Tehnički problem',
+                'Povrat novca',
+                'Ostalo',
+                'Izvoz podataka',
+                'Brisanje računa',
+              ].map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Vaša poruka
+            <textarea name="body" minLength={10} maxLength={10000} required />
+          </label>
+          <Button disabled={busy}>Pošalji zahtjev</Button>
+        </form>
+      )}
+      <QueryState query={q}>
+        {q.data?.length ? (
+          q.data.map((t) => (
+            <article className="panel" key={t.id}>
+              <div className="section-title">
+                <h3>{t.subject}</h3>
+                <StatusBadge status={t.status} />
+              </div>
+              <p>{t.body}</p>
+              <small>
+                {t.category} · {localDate(t.created_at)}
+              </small>
+              <div>
+                <Button variant="ghost" onClick={() => setSelected(selected === t.id ? '' : t.id)}>
+                  Otvori razgovor
+                </Button>
+              </div>
+              {selected === t.id && <SupportConversation ticketId={t.id} admin={admin} />}
+            </article>
+          ))
+        ) : (
+          <EmptyState title="Nema otvorenih zahtjeva" />
+        )}
+      </QueryState>
+    </>
+  );
+}
+function SupportConversation({ ticketId, admin }: { ticketId: string; admin: boolean }) {
+  const q = useRows<{ id: string; body: string; created_at: string }>('support_messages', {
+    ticket_id: ticketId,
+  });
+  const [body, setBody] = useState('');
+  const cache = useQueryClient();
+  return (
+    <>
+      <QueryState query={q}>
+        {q.data?.map((m) => (
+          <div className="message" key={m.id}>
+            <p>{m.body}</p>
+            <small>{localDate(m.created_at)}</small>
+          </div>
+        ))}
+      </QueryState>
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const ok = await action(async () => {
+            await rpc('reply_ticket', { p_ticket: ticketId, p_body: body, p_close: false });
+            await cache.invalidateQueries({ queryKey: ['support_messages'] });
+          });
+          if (ok) setBody('');
+        }}
+      >
+        <label>
+          Odgovor
+          <textarea
+            required
+            maxLength={5000}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </label>
+        <div className="actions">
+          <Button>Pošalji odgovor</Button>
+          {admin && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                void action(async () => {
+                  await rpc('reply_ticket', {
+                    p_ticket: ticketId,
+                    p_body: 'Zahtjev je zatvoren.',
+                    p_close: true,
+                  });
+                  await cache.invalidateQueries();
+                })
+              }
+            >
+              Zatvori zahtjev
+            </Button>
+          )}
+        </div>
+      </form>
+    </>
+  );
+}
+export function ContactPage() {
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  return (
+    <div className="container section">
+      <PageHeader
+        eyebrow="TU SMO ZA VAS"
+        title="Razgovarajmo o vašem zadatku."
+        description="Pošaljite pitanje ili opišite ideju. Nemojte slati lozinke ni osjetljive dokumente ovim obrascem."
+      />
+      <div className="contact-grid">
+        <div>
+          <h2>Prvi korak je jednostavan.</h2>
+          <p>
+            Za konkretan zadatak koristite narudžbu kako biste upute, datoteke i komunikaciju
+            pratili na jednom mjestu.
+          </p>
+          <Button asChild variant="outline">
+            <Link to="/app/nova-narudzba">
+              Zatraži uslugu <ArrowRight size={16} />
+            </Link>
+          </Button>
+          <div className="notice">
+            <FileText />
+            <p>
+              Kontaktni i poslovni podaci pružatelja još nisu konfigurirani. Pravne stranice sadrže
+              predloške.
+            </p>
+          </div>
+        </div>
+        {!configured ? (
+          <Unavailable>
+            Kontaktni obrazac nije dostupan dok se ne poveže Supabase i objavi kontaktna funkcija.
+          </Unavailable>
+        ) : sent ? (
+          <EmptyState
+            title="Poruka je zaprimljena"
+            description="Vaš upit spremljen je za obradu."
+          />
+        ) : (
+          <form
+            className="panel"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              setBusy(true);
+              const ok = await action(
+                () =>
+                  invoke('contact', {
+                    name: f.get('name'),
+                    email: f.get('email'),
+                    body: f.get('body'),
+                    website: f.get('website'),
+                  }),
+                'Upit je zaprimljen.',
+              );
+              setSent(ok);
+              setBusy(false);
+            }}
+          >
+            <label>
+              Ime i prezime
+              <input name="name" required minLength={2} maxLength={150} />
+            </label>
+            <label>
+              E-mail
+              <input type="email" name="email" required />
+            </label>
+            <label>
+              Poruka
+              <textarea name="body" required minLength={10} maxLength={5000} />
+            </label>
+            <label className="sr-only" aria-hidden="true">
+              Web stranica
+              <input name="website" tabIndex={-1} autoComplete="off" />
+            </label>
+            <p>
+              Podaci se koriste za obradu upita. Pročitajte{' '}
+              <Link to="/pravila-privatnosti">pravila privatnosti</Link>.
+            </p>
+            <Button disabled={busy}>Pošalji upit</Button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+export function MessagesPage({ admin = false }: { admin?: boolean }) {
+  const { id } = useParams();
+  const q = useRows<Order>('orders');
+  if (id) return <ConversationPanel orderId={id} admin={admin} />;
+  return (
+    <>
+      <PageHeader title="Poruke" description="Svaka narudžba ima zaseban razgovor." />
+      <QueryState query={q}>
+        {q.data?.length ? (
+          q.data.map((o) => (
+            <Link
+              className="order-card"
+              key={o.id}
+              to={`${admin ? '/admin' : '/app'}/poruke/${o.id}`}
+            >
+              <div>
+                <h3>{o.title}</h3>
+                <p>{o.number}</p>
+              </div>
+              <ArrowRight size={16} />
+            </Link>
+          ))
+        ) : (
+          <EmptyState
+            title="Još nema razgovora"
+            description="Razgovor se otvara uz vašu narudžbu."
+          />
+        )}
+      </QueryState>
+    </>
+  );
+}
+export function ServiceEditor({ service, done }: { service?: Service; done: () => void }) {
+  const cache = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  return (
+    <form
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        const fields = {
+          name: String(f.get('name')),
+          slug: String(f.get('slug')),
+          description: String(f.get('description')),
+          category: String(f.get('category')),
+          icon: String(f.get('icon')),
+          price_cents: f.get('price') ? Number(f.get('price')) : null,
+          delivery_days: Number(f.get('days')),
+          revisions: Number(f.get('revisions')),
+          split_enabled: f.get('split') === 'on',
+          split_min_cents: Number(f.get('min')),
+          active: f.get('active') === 'on',
+          included: String(f.get('included')).split('\n').filter(Boolean),
+          excluded: String(f.get('excluded')).split('\n').filter(Boolean),
+        };
+        setBusy(true);
+        const ok = await action(async () => {
+          const db = requireDb();
+          const { error } = await (service
+            ? db.from('services').update(fields).eq('id', service.id)
+            : db.from('services').insert(fields));
+          if (error) throw error;
+          await cache.invalidateQueries({ queryKey: ['services'] });
+        });
+        setBusy(false);
+        if (ok) done();
+      }}
+    >
+      <label>
+        Naziv
+        <input name="name" required maxLength={150} defaultValue={service?.name} />
+      </label>
+      <label>
+        Slug
+        <input name="slug" pattern="[a-z0-9-]+" required defaultValue={service?.slug} />
+      </label>
+      <label>
+        Kategorija
+        <input name="category" required defaultValue={service?.category || 'Ostalo'} />
+      </label>
+      <label>
+        Ikona
+        <select name="icon" defaultValue={service?.icon || 'FileText'}>
+          {['FileText', 'Presentation', 'Table2', 'Files', 'Mail', 'LayoutGrid', 'Sparkles'].map(
+            (x) => (
+              <option key={x}>{x}</option>
+            ),
+          )}
+        </select>
+      </label>
+      <label>
+        Opis
+        <textarea name="description" required defaultValue={service?.description} />
+      </label>
+      <label>
+        Uključeno (jedna stavka po retku)
+        <textarea name="included" defaultValue={service?.included.join('\n')} />
+      </label>
+      <label>
+        Nije uključeno (jedna stavka po retku)
+        <textarea name="excluded" defaultValue={service?.excluded.join('\n')} />
+      </label>
+      <label>
+        Cijena u centima (prazno za individualnu ponudu)
+        <input
+          type="number"
+          name="price"
+          min={100}
+          max={100000000}
+          defaultValue={service?.price_cents ?? ''}
+        />
+      </label>
+      <div className="form-row">
+        <label>
+          Okvirni rok u danima
+          <input
+            type="number"
+            name="days"
+            min={0}
+            required
+            defaultValue={service?.delivery_days || 0}
+          />
+        </label>
+        <label>
+          Broj revizija
+          <input
+            name="revisions"
+            type="number"
+            min={0}
+            required
+            defaultValue={service?.revisions ?? 1}
+          />
+        </label>
+      </div>
+      <label className="checkbox">
+        <input type="checkbox" name="split" defaultChecked={service?.split_enabled} />
+        Dopusti 50/50
+      </label>
+      <label>
+        Minimalni iznos za 50/50 u centima
+        <input
+          name="min"
+          type="number"
+          min={200}
+          required
+          defaultValue={service?.split_min_cents || 10000}
+        />
+      </label>
+      <label className="checkbox">
+        <input name="active" type="checkbox" defaultChecked={service?.active ?? true} />
+        Aktivna usluga
+      </label>
+      <Button disabled={busy}>Spremi uslugu</Button>
+    </form>
+  );
+}
