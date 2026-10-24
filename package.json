@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "node scripts/build-commerce-upgrade.mjs --check && node scripts/build-admin-upgrade.mjs --check && node scripts/check-public-config.mjs && tsc -b && vite build && node scripts/check-public-config.mjs --dist",
+    "build": "node scripts/build-payment-methods-upgrade.mjs --check && node scripts/build-commerce-upgrade.mjs --check && node scripts/build-admin-upgrade.mjs --check && node scripts/check-public-config.mjs && tsc -b && vite build && node scripts/check-public-config.mjs --dist",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:e2e": "playwright test",
@@ -16,7 +16,8 @@
     "backend:start": "bash scripts/start-local.sh",
     "backend:functions": "/workspace/.tools/formapoint/supabase functions serve --env-file .env.edge.local",
     "test:local": "node scripts/test-local.mjs",
-    "test:edge": "deno test --allow-env --node-modules-dir=none --no-config --lock=supabase/functions/deno.lock --frozen supabase/functions/_tests"
+    "test:edge": "deno test --allow-env --node-modules-dir=none --no-config --lock=supabase/functions/deno.lock --frozen supabase/functions/_tests",
+    "deploy:stripe": "node scripts/deploy-stripe.mjs"
   },
   "engines": {
     "node": ">=22.12"

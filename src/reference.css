@@ -3414,3 +3414,50 @@ body {
 .payment-icon-row > .button {
   padding: 7px;
 }
+.payment-settings-stack {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+}
+.payment-settings-stack > .panel {
+  margin: 0;
+}
+.managed-payment-method {
+  padding: 18px 0;
+  border-bottom: 1px solid #e5eafa;
+}
+.managed-payment-method > p {
+  font-size: 12px;
+  color: #63708f;
+}
+.payment-method-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.payment-method-manager .panel-heading {
+  align-items: center;
+}
+.payment-method-manager .panel-heading h3 {
+  margin: 0;
+}
+.payment-method-manager > .notice {
+  margin: 16px 0;
+}
+.custom-payment-label {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border: 1px solid #dce4f5;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+.wallet-availability {
+  font-size: 11px !important;
+  margin-top: 8px !important;
+}
+.custom-payment-icons {
+  flex-wrap: wrap;
+}

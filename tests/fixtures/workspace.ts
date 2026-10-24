@@ -45,7 +45,8 @@ export async function workspaceFixture(
     admin = false,
     empty = false,
     fail = false,
-  }: { admin?: boolean; empty?: boolean; fail?: boolean } = {},
+    stripe = false,
+  }: { admin?: boolean; empty?: boolean; fail?: boolean; stripe?: boolean } = {},
 ) {
   const expiry = Math.floor(Date.now() / 1000) + 3600;
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -84,8 +85,8 @@ export async function workspaceFixture(
       {
         id: true,
         platform_name: 'FormaPoint',
-        stripe_enabled: false,
-        maintenance: true,
+        stripe_enabled: stripe,
+        maintenance: !stripe,
         contact_phone: '+385 1 000 000',
         public_contact_email: 'kontakt@example.invalid',
         facebook_url: '',
@@ -135,6 +136,16 @@ export async function workspaceFixture(
     newsletter_campaigns: [],
     newsletter_deliveries: [],
     promo_codes: [],
+    payment_methods: ['visa', 'mastercard'].map((code, i) => ({
+      id: `payment-method-${i}`,
+      code,
+      name: i === 0 ? 'Visa' : 'Mastercard',
+      provider: 'stripe',
+      enabled: true,
+      verified: true,
+      icon_url: null,
+      created_at: '2026-10-01T10:00:00Z',
+    })),
   };
   const uploadedIcons = new Map<string, Buffer>();
   await page.route('http://127.0.0.1:54321/**', async (route) => {
@@ -279,8 +290,8 @@ export async function workspaceFixture(
       user_roles: [{ user_id: fixtureUser, role: admin ? 'ADMIN' : 'CUSTOMER' }],
       services: fixtureServices,
       site_settings: {
-        stripe_enabled: false,
-        maintenance: true,
+        stripe_enabled: stripe,
+        maintenance: !stripe,
         created_at: '2026-10-01T10:00:00Z',
       },
       orders: empty ? [] : fixtureOrders,

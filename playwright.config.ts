@@ -26,12 +26,14 @@ export default defineConfig({
     },
     {
       name: 'workspace-desktop',
-      testMatch: /workspace\.spec\.ts|workspace-states\.spec\.ts|admin-tools\.spec\.ts/,
+      testMatch:
+        /workspace\.spec\.ts|workspace-states\.spec\.ts|admin-tools\.spec\.ts|payment-methods\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: 'http://127.0.0.1:5175' },
     },
     {
       name: 'workspace-mobile',
-      testMatch: /workspace\.spec\.ts|workspace-states\.spec\.ts|admin-tools\.spec\.ts/,
+      testMatch:
+        /workspace\.spec\.ts|workspace-states\.spec\.ts|admin-tools\.spec\.ts|payment-methods\.spec\.ts/,
       use: {
         ...devices['iPhone 13'],
         defaultBrowserType: 'chromium',

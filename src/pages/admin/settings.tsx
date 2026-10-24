@@ -1,4 +1,4 @@
-import { PaymentIconUpload } from '../../components/payment-icon-upload';
+import { PaymentMethodManager } from '../../components/payment-method-manager';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -292,67 +292,71 @@ export function PlatformSettings() {
                     </p>
                     <Button disabled={busy || !expanded}>Spremi podatke za uplatu</Button>
                   </form>
-                  <form
-                    className="panel"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void save(e.currentTarget, 'site');
-                    }}
-                  >
-                    <h2>Plaćanje i rokovi</h2>
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        name="stripe_enabled"
-                        defaultChecked={site.stripe_enabled}
-                      />
-                      Stripe je konfiguriran i provjeren
-                    </label>
-                    <label className="checkbox">
-                      <input type="checkbox" name="maintenance" defaultChecked={site.maintenance} />
-                      Način pripreme — online naplata isključena
-                    </label>
-                    <div className="form-row">
-                      <label>
-                        Rok za zahtjev za otkazivanje (dani)
+                  <div className="payment-settings-stack">
+                    <form
+                      className="panel"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void save(e.currentTarget, 'site');
+                      }}
+                    >
+                      <h2>Plaćanje i rokovi</h2>
+                      <label className="checkbox">
                         <input
-                          name="cancellation_days"
-                          type="number"
-                          min={0}
-                          max={365}
-                          defaultValue={site.cancellation_days ?? ''}
+                          type="checkbox"
+                          name="stripe_enabled"
+                          defaultChecked={site.stripe_enabled}
                         />
+                        Stripe je konfiguriran i provjeren
                       </label>
-                      <label>
-                        Rok za završnu uplatu (dani)
+                      <label className="checkbox">
                         <input
-                          name="final_payment_days"
-                          type="number"
-                          min={1}
-                          max={365}
-                          defaultValue={site.final_payment_days ?? ''}
+                          type="checkbox"
+                          name="maintenance"
+                          defaultChecked={site.maintenance}
                         />
+                        Način pripreme — online naplata isključena
                       </label>
+                      <div className="form-row">
+                        <label>
+                          Rok za zahtjev za otkazivanje (dani)
+                          <input
+                            name="cancellation_days"
+                            type="number"
+                            min={0}
+                            max={365}
+                            defaultValue={site.cancellation_days ?? ''}
+                          />
+                        </label>
+                        <label>
+                          Rok za završnu uplatu (dani)
+                          <input
+                            name="final_payment_days"
+                            type="number"
+                            min={1}
+                            max={365}
+                            defaultValue={site.final_payment_days ?? ''}
+                          />
+                        </label>
+                      </div>
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
+                          name="policies_approved"
+                          defaultChecked={site.policies_approved}
+                        />
+                        Pravila su pravno provjerena i odobrena za nove narudžbe
+                      </label>
+                      <p>
+                        Rokovi se zaključavaju na novoj narudžbi. Ne mijenjaju ranije ugovorene
+                        uvjete i ne otkazuju automatski narudžbe.
+                      </p>
+                      <Button disabled={busy || !expanded}>Spremi plaćanje i pravila</Button>
+                    </form>
+                    <div className="panel">
+                      <PaymentMethodManager />
                     </div>
-                    <label className="checkbox">
-                      <input
-                        type="checkbox"
-                        name="policies_approved"
-                        defaultChecked={site.policies_approved}
-                      />
-                      Pravila su pravno provjerena i odobrena za nove narudžbe
-                    </label>
-                    <p>
-                      Rokovi se zaključavaju na novoj narudžbi. Ne mijenjaju ranije ugovorene uvjete
-                      i ne otkazuju automatski narudžbe.
-                    </p>
-                    <PaymentIconUpload icons={site.payment_icons || {}} />
-                    <p>
-                      Ikona je vizualni materijal; ne aktivira platnu integraciju. Neaktivne metode
-                      ne prikazuju se kupcima kao dostupne.
-                    </p>
-                    <Button disabled={busy || !expanded}>Spremi plaćanje i pravila</Button>
-                  </form>
+                  </div>
                 </div>
               )}
               {tab === 'email' && (

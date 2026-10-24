@@ -1,3 +1,4 @@
+import { usePublicPaymentMethods } from '../hooks/use-payment-methods';
 import { useSiteSettings } from '../hooks/use-site-settings';
 import { useQuery } from '@tanstack/react-query';
 import { CreditCard, Gift, LockKeyhole, ArrowRight } from 'lucide-react';
@@ -20,6 +21,18 @@ export function usePaymentAvailability() {
 export function PaymentMethods({ compact = false }: { compact?: boolean }) {
   const q = usePaymentAvailability();
   const site = useSiteSettings().data;
+  const methods = usePublicPaymentMethods();
+  const visible =
+    methods.data === null
+      ? ['visa', 'mastercard']
+          .filter((code) => site?.payment_icons?.[code])
+          .map((code) => ({
+            id: code,
+            code,
+            name: code === 'visa' ? 'Visa' : 'Mastercard',
+            icon_url: site!.payment_icons![code],
+          }))
+      : methods.data || [];
   const active = configured && q.data === true;
   return (
     <section
@@ -54,22 +67,30 @@ export function PaymentMethods({ compact = false }: { compact?: boolean }) {
               Ponovi provjeru
             </button>
           )}
+          {active && visible.some((m) => ['apple_pay', 'google_pay'].includes(m.code)) && (
+            <p className="wallet-availability">
+              Novčanici se prikazuju u Stripe Checkoutu kada ih podržavaju vaš uređaj i kartica.
+            </p>
+          )}
         </div>
         {active && (
           <>
             <span className="badge status-succeeded">Aktivno</span>
             <div className="custom-payment-icons">
-              {['visa', 'mastercard'].map(
-                (k) =>
-                  site?.payment_icons?.[k] && (
-                    <img
-                      key={k}
-                      src={site.payment_icons[k]}
-                      alt={k === 'visa' ? 'Visa' : 'Mastercard'}
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
-                  ),
+              {visible.map((method) =>
+                method.icon_url ? (
+                  <img
+                    key={method.id}
+                    src={method.icon_url}
+                    alt={method.name}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="custom-payment-label" key={method.id}>
+                    {method.name}
+                  </span>
+                ),
               )}
             </div>
           </>

@@ -16,9 +16,18 @@ Kod se već nalazi u repozitoriju. Iz njegova korijena, nakon instalacije Node.j
 
 ```sh
 npx supabase login
-npx supabase functions deploy checkout --project-ref heseilggogbtmqeuwlku
-npx supabase functions deploy stripe-webhook --project-ref heseilggogbtmqeuwlku
+npx supabase functions deploy checkout --project-ref heseilggogbtmqeuwlku --use-api
+npx supabase functions deploy stripe-webhook --project-ref heseilggogbtmqeuwlku --use-api
 ```
+
+Ako sve radite online, otvorite repozitorij u GitHub Codespacesu. U njegovu terminalu osvježite kod i pokrenite pripremljenu objavu:
+
+```sh
+git pull --ff-only
+npm run deploy:stripe
+```
+
+Ako CLI još nije prijavljen, prvo pokrenite `npx supabase login` i otvorite prikazanu poveznicu. Skripta objavljuje samo `checkout` i `stripe-webhook` s opcijom `--use-api`. Njome se pakiranje odvija preko Supabase Management API-ja, pa se izbjegava lokalno Docker preuzimanje ovisnosti koje u Codespacesu može završiti s `Temporary failure in name resolution` na `_shared/http.ts`. Zastavica je podržana u Supabase CLI-u; ne mijenja se TLS provjera ni izvorni kod SDK-a. Sama promjena u GitHubu ne ponavlja ranije neuspjelu objavu funkcije.
 
 Kod mora uključivati i `supabase/functions/_shared`, a `supabase/config.toml` postavlja provjeru JWT-a na gatewayu na false za ove dvije funkcije. To je namjerno: `checkout` sam potvrđuje prijavljenog korisnika kroz Supabase Auth, dok `stripe-webhook` provjerava Stripeov potpis. Sam GitHub/Vercel deploy ne objavljuje Supabase funkcije.
 
@@ -81,3 +90,11 @@ Uključite Stripe i isključite način pripreme u aplikaciji. Prije otvaranja ku
 - Checkout daje pogrešku: provjerite objavu `checkout`, zapis funkcije, Stripe Secret key i točno podudaranje `APP_URL` s domenom preglednika.
 - Stripe je naplatio, a narudžba čeka uplatu: provjerite dostavu webhooka i njegov Signing secret. Ispravite uzrok pa u Stripeu ponovite dostavu istog stvarnog događaja. Ne naplaćujte kupcu ponovno.
 - Live ključ ne radi: provjerite `STRIPE_LIVE_ENABLED=true` i pripadnost live webhook odredišta.
+
+## Google Pay, Apple Pay i prikaz metoda u aplikaciji
+
+U Stripe Dashboardu otvorite **Settings → Payment methods** i konfiguraciju koja se koristi za Checkout. Provjerite dostupnost Apple Paya i Google Paya za svoj račun te ih uključite ako su ponuđeni. Ne treba vam osobni Google Pay novčanik da biste kao trgovac prihvaćali takvu uplatu. Kupac koristi vlastiti novčanik. Stripe Checkout odlučuje hoće li prikazati gumb prema računu trgovca, uređaju, pregledniku i kartici kupca; provjeru napravite na podržanom uređaju s pripremljenim novčanikom.
+
+FormaPoint otvara Stripeovu hostanu Checkout stranicu s kartičnim plaćanjem. Apple Pay i Google Pay su novčanici kroz tu integraciju. Njihovo dodavanje u FormaPoint popis ne mijenja Stripe račun. U adminu nakon SQL nadogradnje 008 dodajte metodu i za prikaz kupcima potvrdite da ste je uključili i provjerili na Stripeu. Visa i Mastercard su oznake kartičnih mreža; skrivanje oznake ne blokira tu mrežu u Stripeu. Glavno uključivanje kartične naplate i dalje kontroliraju Stripe prekidač i način pripreme.
+
+KEKS Pay nije povezan s postojećom Stripe naplatom. U popis možete dodati njegov naziv i ikonu za pripremu, ali ostaje skriven kupcima dok se ne implementira stvarna integracija s tim pružateljem. Početni popis sadrži samo Visa i Mastercard. Postavke se otvaraju na [Stripe Dashboardu](https://dashboard.stripe.com/settings/payment_methods).
