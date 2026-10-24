@@ -60,7 +60,7 @@ Servisi se ne mogu smatrati trajno pokrenutima nakon obnove cloud okruženja. Po
 npm run build            # TypeScript i produkcijski bundle
 npm test                 # 22 testa novca i domenskih pravila
 npm run db:test          # Docker PostgreSQL, migracije i 43 serverske provjere
-npm run test:e2e          # javni desktop/mobilni tokovi; poseban port 5174
+npm run test:e2e          # javni i fixture privatni tokovi; portovi 5174 i 5175
 npm run check:edge       # Deno provjera svih 6 Edge funkcija
 npm run test:edge        # 3 lokalne Stripe kriptografske provjere bez naplate
 npm run test:local       # lokalni Supabase API, Storage i browser; zahtijeva pokrenute servise
@@ -79,3 +79,5 @@ Frontend varijable postavljaju se pri buildu. Tajne ostaju u Supabase Secrets. U
 Prije objave vlasnik mora unijeti stvarne poslovne podatke, cijene i pravila, odobriti pravne tekstove, postaviti rokove čuvanja/brisanja, backup i monitoring te povezati usklađeno izdavanje računa/fiskalizaciju. Interna evidencija nije službeni račun. Automatski antivirus, PayPal, bankovni workflow i CorvusPay nisu završeni; vidjeti STATUS.
 
 Supabase, hosting, Stripe, e-mail, pohrana i promet imaju ograničenja i mogu stvarati troškove. Ne pretpostavlja se neograničen besplatan plan. Postavite upozorenja na potrošnju, limite veličine datoteka i politiku zadržavanja prije aktivacije.
+
+Vizualno usklađenje prema osam referentnih prikaza opisano je u [docs/DIZAJN.md](docs/DIZAJN.md). Zajedničke komponente administrator može pregledati na `/admin/dizajn-sustav`.

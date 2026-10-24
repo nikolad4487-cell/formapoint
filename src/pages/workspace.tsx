@@ -1,3 +1,16 @@
+import {
+  OrderStageTimeline,
+  OrderSummaryTable,
+  PaymentRemainder,
+} from '../components/order-overview';
+import {
+  RecentMessages,
+  RecommendedServices,
+  RecentActivity,
+  BusinessCharts,
+} from '../components/overview-panels';
+import { PageNote } from '../components/brand';
+import { PaymentMethods } from '../components/payment-methods';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -6,15 +19,15 @@ import {
   ArrowRight,
   Plus,
   Download,
+  Folder,
   FileText,
   ShoppingBag,
   CreditCard,
+  Gift,
   Clock3,
   Send,
   Upload,
   Trash2,
-  CheckCircle2,
-  LockKeyhole,
 } from 'lucide-react';
 import { useAuth } from '../hooks/use-auth';
 import { useRows, useServices } from '../hooks/use-data';
@@ -67,93 +80,181 @@ export async function action(fn: () => Promise<unknown>, success = 'Promjene su 
   }
 }
 export function DashboardPage({ admin = false }: { admin?: boolean }) {
-  const { session } = useAuth();
   const q = useRows<Order>('orders');
   const payments = useRows<Payment>('payments');
+  const files = useRows<OrderFile>('order_files');
   const data = q.data || [];
-  const active = data.filter((x) => !['completed', 'cancelled'].includes(x.status));
+  const active = data.filter((o) => !['completed', 'cancelled', 'delivered'].includes(o.status));
+  const focus = active[0] || data[0];
   return (
     <>
       <PageHeader
-        eyebrow={admin ? 'POSLOVANJE NA JEDNOM MJESTU' : 'VAŠ DIGITALNI RADNI PROSTOR'}
-        title={
-          admin
-            ? 'Pregled poslovanja'
-            : `Dobro došli${session?.user.user_metadata.first_name ? `, ${session.user.user_metadata.first_name}` : ''}.`
-        }
+        title={admin ? 'Administracija' : 'Nadzorna ploča'}
         description={
           admin
-            ? 'Pregled narudžbi i potvrđenih naplata.'
-            : 'Sve vaše narudžbe, dogovori i datoteke na jednom mjestu.'
+            ? 'Pregled poslovanja, narudžbi, naplata i korisničke podrške.'
+            : 'Pregled vaših narudžbi, uplata i aktivnosti na jednom mjestu.'
         }
         actions={
-          !admin && (
-            <Button asChild>
-              <Link to="/app/nova-narudzba">
-                <Plus size={17} />
-                Nova narudžba
-              </Link>
-            </Button>
-          )
+          <PageNote>
+            {admin ? 'Sve što vam treba na jednom mjestu!' : 'Drago nam je vidjeti vas ponovno!'}
+          </PageNote>
         }
       />
       <QueryState query={q}>
-        <div className="stat-grid">
-          <StatCard label="Aktivne narudžbe" value={active.length} icon={<ShoppingBag />} />
+        <div className={`stat-grid ${admin ? 'admin-stats' : ''}`}>
+          {admin && (
+            <StatCard
+              label="Nove narudžbe"
+              value={
+                data.filter((o) => new Date(o.created_at).getTime() > Date.now() - 7 * 86400000)
+                  .length
+              }
+              description="U posljednjih 7 dana"
+              icon={<ShoppingBag />}
+            />
+          )}
+          <StatCard
+            label="Aktivne narudžbe"
+            value={active.length}
+            description="Narudžbe u tijeku"
+            icon={<FileText />}
+          />
           <StatCard
             label="Čekaju uplatu"
             value={
-              data.filter((x) => ['deposit_pending', 'final_pending'].includes(x.status)).length
+              data.filter((o) => ['deposit_pending', 'final_pending'].includes(o.status)).length
             }
+            description="Početnu ili završnu"
             icon={<Clock3 />}
+            tone="orange"
           />
           <StatCard
-            label="Potvrđeno naplaćeno, nakon povrata"
-            value={money(data.reduce((s, o) => s + o.paid_cents, 0))}
+            label="Potvrđeno naplaćeno"
+            value={money(data.reduce((n, o) => n + o.paid_cents, 0))}
+            description="Nakon evidentiranih povrata"
             icon={<CreditCard />}
+            tone="green"
           />
           <StatCard
-            label="Dovršene narudžbe"
-            value={data.filter((x) => x.status === 'completed').length}
-            icon={<CheckCircle2 />}
+            label="Dostupne datoteke"
+            value={
+              files.isError
+                ? 'Nedostupno'
+                : files.isPending
+                  ? '…'
+                  : files.data?.filter((f) => {
+                      const o = data.find((o) => o.id === f.order_id);
+                      return (
+                        f.scan_status === 'clean' &&
+                        (admin ||
+                          f.kind !== 'final' ||
+                          Boolean(o && o.total_cents !== null && o.paid_cents >= o.total_cents))
+                      );
+                    }).length || 0
+            }
+            description="Provjerene i otključane"
+            icon={<Folder />}
+            tone="violet"
           />
         </div>
-        <div className="panel">
-          <h2>Nedavne narudžbe</h2>
-          {data.length ? (
-            data.slice(0, 6).map((o) => <OrderCard key={o.id} order={o} admin={admin} />)
+        <div className="overview-grid">
+          <section className="panel">
+            <div className="panel-heading">
+              <h2>{admin ? 'Najnovije narudžbe' : 'Moje narudžbe'}</h2>
+              <Link to={`${admin ? '/admin' : '/app'}/narudzbe`}>
+                Sve narudžbe <ArrowRight size={15} />
+              </Link>
+            </div>
+            <OrderSummaryTable orders={data.slice(0, 5)} admin={admin} />
+          </section>
+          {admin ? (
+            <RecentActivity />
           ) : (
-            <EmptyState
-              title="Vaš radni prostor je spreman"
-              description="Kada pošaljete prvi zahtjev, ovdje ćete pratiti sve dogovore i korake izrade."
-            />
+            <section className="panel tracking-panel">
+              <div className="panel-heading">
+                <h2>Praćenje narudžbe</h2>
+                {focus && (
+                  <Link to={`/app/narudzbe/${focus.id}`}>
+                    Detalji <ArrowRight size={15} />
+                  </Link>
+                )}
+              </div>
+              {focus ? (
+                <>
+                  <div className="tracking-order">
+                    <span className="service-icon">
+                      <FileText />
+                    </span>
+                    <div>
+                      <h3>{focus.title}</h3>
+                      <p>{focus.number}</p>
+                    </div>
+                  </div>
+                  <OrderStageTimeline order={focus} />
+                  <PaymentRemainder order={focus} />
+                </>
+              ) : (
+                <EmptyState
+                  title="Započnite prvi projekt"
+                  description="Odaberite uslugu i pošaljite svoj zahtjev."
+                  action={
+                    <Button asChild>
+                      <Link to="/app/nova-narudzba">
+                        <Plus size={16} />
+                        Nova narudžba
+                      </Link>
+                    </Button>
+                  }
+                />
+              )}
+            </section>
+          )}
+        </div>
+        <div className="overview-lower">
+          {admin ? (
+            <QueryState query={payments}>
+              <BusinessCharts orders={data} payments={payments.data || []} />
+            </QueryState>
+          ) : (
+            <>
+              <RecentMessages />
+              <RecommendedServices />
+            </>
           )}
         </div>
       </QueryState>
       {admin && (
-        <div className="notice">
-          <LockKeyhole />
-          <p>
-            Prikazan je operativni pregled najviše 200 najnovijih zapisa. Naplate nisu
-            računovodstveni prihod.{' '}
-            {payments.data?.some((p) => p.fee_cents === null)
-              ? 'Za dio transakcija stvarna naknada još nije dostupna.'
+        <p className="data-scope-note">
+          Operativni pregled do 200 najnovijih zapisa. Naplate nisu računovodstveni prihod.{' '}
+          {payments.isError
+            ? 'Naplate trenutačno nisu dostupne.'
+            : payments.data?.some((p) => p.fee_cents === null)
+              ? 'Neke stvarne naknade još nisu dostupne.'
               : ''}
-          </p>
-        </div>
+        </p>
       )}
     </>
   );
 }
 export function OrdersPage({ admin = false }: { admin?: boolean }) {
   const q = useRows<Order>('orders');
-  const [search, setSearch] = useState('');
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get('q') || '');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
-  const [view, setView] = useState('cards');
+  const incomingSearch = searchParams.get('q') || '';
+  useEffect(() => {
+    setSearch(incomingSearch);
+    setPage(1);
+  }, [incomingSearch]);
+  const [view, setView] = useState('table');
   const data = (q.data || []).filter(
     (o) =>
-      (status === 'all' || o.status === status) &&
+      (status === 'all' ||
+        (status === 'payment_pending'
+          ? ['deposit_pending', 'final_pending'].includes(o.status)
+          : o.status === status)) &&
       `${o.number} ${o.title}`.toLocaleLowerCase('hr').includes(search.toLocaleLowerCase('hr')),
   );
   const shown = data.slice((page - 1) * 10, page * 10);
@@ -181,6 +282,7 @@ export function OrdersPage({ admin = false }: { admin?: boolean }) {
             }}
           >
             <option value="all">Sve narudžbe</option>
+            <option value="payment_pending">Sve koje čekaju uplatu</option>
             {Object.entries(statuses).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}
@@ -192,37 +294,46 @@ export function OrdersPage({ admin = false }: { admin?: boolean }) {
           {view === 'cards' ? 'Tablični prikaz' : 'Kartični prikaz'}
         </Button>
       </div>
+      <div className="order-filter-pills">
+        {[
+          { label: 'Sve', match: 'all', count: q.data?.length || 0 },
+          {
+            label: 'U izradi',
+            match: 'in_progress',
+            count: q.data?.filter((o) => o.status === 'in_progress').length || 0,
+          },
+          {
+            label: 'Čeka uplatu',
+            match: 'payment_pending',
+            count:
+              q.data?.filter((o) => ['deposit_pending', 'final_pending'].includes(o.status))
+                .length || 0,
+          },
+          {
+            label: 'Završeno',
+            match: 'completed',
+            count: q.data?.filter((o) => o.status === 'completed').length || 0,
+          },
+        ].map((f) => (
+          <button
+            key={f.match}
+            className={status === f.match ? 'active' : ''}
+            onClick={() => {
+              setStatus(f.match);
+              setPage(1);
+            }}
+          >
+            {f.label}
+            <span>{q.isPending ? '…' : q.isError ? '—' : f.count}</span>
+          </button>
+        ))}
+      </div>
       <QueryState query={q}>
         {shown.length ? (
           view === 'cards' ? (
             shown.map((o) => <OrderCard key={o.id} order={o} admin={admin} />)
           ) : (
-            <div className="panel data-table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Narudžba</th>
-                    <th>Naziv</th>
-                    <th>Status</th>
-                    <th>Cijena</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shown.map((o) => (
-                    <tr key={o.id}>
-                      <td>
-                        <Link to={`${admin ? '/admin' : '/app'}/narudzbe/${o.id}`}>{o.number}</Link>
-                      </td>
-                      <td>{o.title}</td>
-                      <td>
-                        <StatusBadge status={o.status} />
-                      </td>
-                      <td>{o.total_cents === null ? 'Prema ponudi' : money(o.total_cents)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <OrderSummaryTable orders={shown} admin={admin} expandable />
           )
         ) : (
           <EmptyState title="Nema narudžbi za odabrani prikaz" />
@@ -1076,151 +1187,286 @@ export function CartPage() {
   const [model, setModel] = useState('full');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  const [changing, setChanging] = useState<string | null>(null);
   const navigate = useNavigate();
-  const total = (q.data || []).reduce((n, i) => n + (i.services?.price_cents || 0) * i.quantity, 0);
+  const items = q.data || [];
+  const available = items.every((i) => i.services && i.services.price_cents !== null);
+  const total = items.reduce((n, i) => n + (i.services?.price_cents || 0) * i.quantity, 0);
   const split =
-    !!q.data?.length &&
-    q.data.every(
+    items.length > 0 &&
+    items.every(
       (i) =>
         i.services?.split_enabled &&
         (i.services?.price_cents || 0) * i.quantity >= (i.services?.split_min_cents || 0),
     );
+  useEffect(() => {
+    if (!split) setModel('full');
+  }, [split]);
+  async function quantity(item: CartItem, n: number) {
+    if (changing || n < 0 || n > 100) return;
+    setChanging(item.id);
+    await action(async () => {
+      await rpc('cart_set', { p_service: item.service_id, p_quantity: n });
+      await cache.invalidateQueries({ queryKey: ['cart'] });
+    });
+    setChanging(null);
+  }
   return (
     <>
       <PageHeader
         title="Košarica"
-        description="Stavke se čuvaju u vašem računu. Svaka stavka postaje zasebna narudžba i zasebna naplata."
+        description="Pregledajte odabrane usluge, prilagodite količine i potvrdite narudžbe."
+        actions={<PageNote>Sve vaše usluge na jednom mjestu!</PageNote>}
       />
       <QueryState query={q}>
-        <div className="panel">
-          {q.data?.length ? (
-            q.data.map((i) => (
-              <div className="file-row" key={i.id}>
-                <div>
-                  <h3>{i.services?.name || 'Nedostupna usluga'}</h3>
-                  <p>{money((i.services?.price_cents || 0) * i.quantity)}</p>
-                </div>
-                <label>
-                  Količina
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={i.quantity}
-                    onChange={(e) => {
-                      const n = Number(e.target.value);
-                      if (n >= 1 && n <= 100)
-                        void action(async () => {
-                          await rpc('cart_set', { p_service: i.service_id, p_quantity: n });
-                          await cache.invalidateQueries({ queryKey: ['cart'] });
-                        });
-                    }}
-                  />
-                </label>
-                <Button
-                  variant="ghost"
-                  aria-label={`Ukloni ${i.services?.name || 'Nedostupna usluga'}`}
-                  onClick={() =>
-                    void action(async () => {
-                      await rpc('cart_set', { p_service: i.service_id, p_quantity: 0 });
-                      await cache.invalidateQueries({ queryKey: ['cart'] });
-                    })
-                  }
-                >
-                  <Trash2 size={17} />
-                </Button>
+        <div className="cart-layout">
+          <div>
+            <section className="panel cart-items">
+              <div className="panel-heading">
+                <h2>Odabrane usluge ({items.length})</h2>
+                <Link to="/usluge">
+                  Sve usluge <ArrowRight size={15} />
+                </Link>
               </div>
-            ))
-          ) : (
-            <EmptyState
-              title="Košarica je prazna"
-              description="U košaricu možete dodati samo usluge s definiranim cjenikom."
-            />
-          )}
+              {items.length ? (
+                items.map((i) => (
+                  <article
+                    className={`cart-item service-${i.services?.icon || 'FileText'}`}
+                    key={i.id}
+                  >
+                    <span className="service-icon">
+                      <ServiceIcon name={i.services?.icon || 'FileText'} />
+                    </span>
+                    <div className="cart-item-copy">
+                      <h3>{i.services?.name || 'Nedostupna usluga'}</h3>
+                      <p>
+                        {i.services?.description ||
+                          'Usluga više nije u aktivnom katalogu. Uklonite je prije potvrde.'}
+                      </p>
+                      <div className="cart-item-meta">
+                        {i.services && (
+                          <>
+                            <span>
+                              <Clock3 size={14} />
+                              {i.services.delivery_days
+                                ? `Okvirno ${i.services.delivery_days} dana`
+                                : 'Rok prema dogovoru'}
+                            </span>
+                            <span>
+                              <FileText size={14} />
+                              {i.services.revisions} revizija
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="cart-item-controls">
+                      <label>
+                        Količina
+                        <div className="quantity-stepper">
+                          <button
+                            aria-label={`Smanji količinu: ${i.services?.name || 'usluga'}`}
+                            disabled={!!changing || i.quantity <= 1}
+                            onClick={() => void quantity(i, i.quantity - 1)}
+                          >
+                            −
+                          </button>
+                          <input
+                            aria-label={`Količina: ${i.services?.name || 'usluga'}`}
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={i.quantity}
+                            disabled={!!changing}
+                            onChange={(e) => {
+                              const n = Number(e.target.value);
+                              if (Number.isInteger(n) && n >= 1 && n <= 100) void quantity(i, n);
+                            }}
+                          />
+                          <button
+                            aria-label={`Povećaj količinu: ${i.services?.name || 'usluga'}`}
+                            disabled={!!changing || i.quantity >= 100}
+                            onClick={() => void quantity(i, i.quantity + 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </label>
+                      <div>
+                        <small>Cijena stavke</small>
+                        <strong>
+                          {i.services?.price_cents != null
+                            ? money(i.services.price_cents * i.quantity)
+                            : 'Nije dostupna'}
+                        </strong>
+                      </div>
+                      <button
+                        className="remove-item"
+                        disabled={!!changing}
+                        onClick={() => void quantity(i, 0)}
+                      >
+                        <Trash2 size={15} />
+                        Ukloni
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <EmptyState
+                  title="Košarica je prazna"
+                  description="Dodajte uslugu s definiranim cjenikom ili pošaljite individualni zahtjev."
+                  action={
+                    <Button asChild>
+                      <Link to="/app/nova-narudzba">
+                        Nova narudžba <ArrowRight size={16} />
+                      </Link>
+                    </Button>
+                  }
+                />
+              )}
+            </section>
+            <section className="panel">
+              <div className="panel-heading">
+                <h2>Možda vas zanima i ovo?</h2>
+                <Link to="/usluge">
+                  Sve usluge <ArrowRight size={15} />
+                </Link>
+              </div>
+              <QueryState query={services}>
+                <div className="cart-suggestions">
+                  {services.data
+                    ?.filter((s) => !items.some((i) => i.service_id === s.id))
+                    .slice(0, 3)
+                    .map((s) => (
+                      <article key={s.id} className={`service-${s.icon}`}>
+                        <span className="service-icon">
+                          <ServiceIcon name={s.icon} />
+                        </span>
+                        <h3>{s.name}</h3>
+                        <p>{s.description}</p>
+                        {s.price_cents !== null ? (
+                          <Button
+                            variant="ghost"
+                            disabled={!!changing}
+                            onClick={() =>
+                              void action(async () => {
+                                await rpc('cart_set', { p_service: s.id, p_quantity: 1 });
+                                await cache.invalidateQueries({ queryKey: ['cart'] });
+                              })
+                            }
+                          >
+                            Dodaj u košaricu <ArrowRight size={14} />
+                          </Button>
+                        ) : (
+                          <Link className="text-link" to={`/usluge/${s.slug}`}>
+                            Zatraži ponudu <ArrowRight size={14} />
+                          </Link>
+                        )}
+                      </article>
+                    ))}
+                </div>
+              </QueryState>
+            </section>
+          </div>
+          <aside>
+            <form
+              className="panel cart-summary"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setBusy(true);
+                const ok = await action(async () => {
+                  await rpc('checkout_cart', { p_description: description, p_model: model });
+                  await cache.invalidateQueries();
+                  navigate('/app/narudzbe');
+                }, 'Narudžbe su kreirane. Otvorite pojedinu narudžbu za plaćanje.');
+                if (!ok) setBusy(false);
+              }}
+            >
+              <h2>Sažetak narudžbe</h2>
+              <dl>
+                <dt>Ukupno stavki</dt>
+                <dd>{items.length}</dd>
+                <dt>Informativni međuzbroj</dt>
+                <dd>{available ? money(total) : 'Nedostupno'}</dd>
+              </dl>
+              <div className="cart-total">
+                <strong>Ukupno</strong>
+                <strong>{available ? money(total) : 'Nedostupno'}</strong>
+              </div>
+              <p className="summary-caption">
+                Konačnu cijenu provjerava poslužitelj. Stavke postaju zasebne narudžbe i naplate.
+              </p>
+              <label>
+                Upute za narudžbe
+                <textarea
+                  required
+                  minLength={10}
+                  maxLength={10000}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Opišite željeni rezultat i važne napomene."
+                />
+              </label>
+              <fieldset className="payment-models">
+                <legend>Opcije plaćanja</legend>
+                <label className={model === 'full' ? 'selected' : ''}>
+                  <input
+                    type="radio"
+                    name="model"
+                    value="full"
+                    checked={model === 'full'}
+                    onChange={() => setModel('full')}
+                  />
+                  <strong>100 % unaprijed</strong>
+                  <span>Puni iznos prije početka izrade.</span>
+                  <b>{available ? money(total) : '—'}</b>
+                </label>
+                <label className={model === 'split' ? 'selected' : ''}>
+                  <input
+                    type="radio"
+                    name="model"
+                    value="split"
+                    disabled={!split}
+                    checked={model === 'split'}
+                    onChange={() => setModel('split')}
+                  />
+                  <strong>50/50 plaćanje</strong>
+                  <span>
+                    {split
+                      ? 'Dva dijela za svaku narudžbu.'
+                      : 'Nije dostupno za sve odabrane stavke.'}
+                  </span>
+                  {split && <b>Prema planu svake narudžbe</b>}
+                </label>
+              </fieldset>
+              <div className="promo-note">
+                <Gift size={22} />
+                <p>
+                  Imate promo kôd? Unesite ga u obrazac{' '}
+                  <Link to="/app/nova-narudzba">pojedinačne nove narudžbe</Link>.
+                </p>
+              </div>
+              <Button disabled={busy || !!changing || !items.length || !available}>
+                {busy ? 'Spremanje…' : 'Potvrdi narudžbe'}
+                <ArrowRight size={17} />
+              </Button>
+              <small>Potvrdom se ne izvršava uplata.</small>
+            </form>
+            <PaymentMethods compact />
+          </aside>
         </div>
       </QueryState>
-      <div className="panel">
-        <h2>Dodaj uslugu</h2>
-        <QueryState query={services}>
-          {services.data?.some((s) => s.price_cents !== null) ? (
-            services.data
-              .filter((s) => s.price_cents !== null)
-              .map((s) => (
-                <div className="file-row" key={s.id}>
-                  <span>
-                    {s.name} · {money(s.price_cents!)}
-                  </span>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      void action(async () => {
-                        const item = q.data?.find((x) => x.service_id === s.id);
-                        await rpc('cart_set', {
-                          p_service: s.id,
-                          p_quantity: (item?.quantity || 0) + 1,
-                        });
-                        await cache.invalidateQueries({ queryKey: ['cart'] });
-                      })
-                    }
-                  >
-                    <Plus size={16} />
-                    Dodaj
-                  </Button>
-                </div>
-              ))
-          ) : (
-            <p>
-              Trenutačno se sve usluge ugovaraju individualnom ponudom.{' '}
-              <Link className="text-link" to="/app/nova-narudzba">
-                Pošalji zahtjev
-              </Link>
-            </p>
-          )}
-        </QueryState>
-      </div>
-      {!!q.data?.length && (
-        <form
-          className="panel"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setBusy(true);
-            const ok = await action(async () => {
-              await rpc('checkout_cart', { p_description: description, p_model: model });
-              await cache.invalidateQueries();
-              navigate('/app/narudzbe');
-            }, 'Narudžbe su kreirane. Otvorite pojedinu narudžbu za plaćanje.');
-            if (!ok) setBusy(false);
-          }}
-        >
-          <h2>Ukupno informativno: {money(total)}</h2>
-          <label>
-            Upute za narudžbe
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              minLength={10}
-              required
-            />
-          </label>
-          <label>
-            Model
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="full">100 %</option>
-              {split && <option value="split">50/50</option>}
-            </select>
-          </label>
-          <p>
-            Konačne cijene provjeravaju se na poslužitelju. Ova radnja kreira narudžbe bez naplate.
-            Promo kod za pojedinačnu narudžbu unesite u obrazac nove narudžbe.
-          </p>
-          <Button disabled={busy}>Kreiraj narudžbe</Button>
-        </form>
-      )}
     </>
   );
 }
 export function PaymentsPage({ admin = false }: { admin?: boolean }) {
   const q = useRows<Payment>('payments');
+  const orders = useRows<Order>('orders');
+  const pending =
+    orders.data?.filter((o) => ['deposit_pending', 'final_pending'].includes(o.status)) || [];
+  const splitOrder = orders.data?.find(
+    (o) => o.payment_model === 'split' && !['cancelled', 'completed'].includes(o.status),
+  );
   const [search, setSearch] = useState('');
   const rows = (q.data || []).filter((p) =>
     `${p.status} ${p.provider} ${p.order_id}`.includes(search),
@@ -1277,12 +1523,106 @@ export function PaymentsPage({ admin = false }: { admin?: boolean }) {
           )
         }
       />
+      <QueryState query={q}>
+        <div className="stat-grid">
+          <StatCard
+            label="Ukupno potvrđeno uplaćeno"
+            value={money(
+              (q.data || [])
+                .filter((p) => ['succeeded', 'refunded', 'partially_refunded'].includes(p.status))
+                .reduce((n, p) => n + p.amount_cents - p.refunded_cents, 0),
+            )}
+            icon={<CreditCard />}
+            tone="green"
+            description="Nakon evidentiranih povrata"
+          />
+          <StatCard
+            label="Transakcije na čekanju"
+            value={q.data?.filter((p) => p.status === 'pending').length || 0}
+            icon={<Clock3 />}
+            tone="orange"
+            description="Čekaju potvrdu pružatelja"
+          />
+          <StatCard
+            label="Preostalo za uplatu"
+            value={
+              orders.isError
+                ? 'Nedostupno'
+                : orders.isPending
+                  ? '…'
+                  : money(
+                      pending.reduce(
+                        (n, o) => n + Math.max(0, (o.total_cents || 0) - o.paid_cents),
+                        0,
+                      ),
+                    )
+            }
+            icon={<Folder />}
+            tone="violet"
+            description="Za narudžbe koje čekaju uplatu"
+          />
+          <StatCard
+            label="Potvrđene transakcije"
+            value={
+              q.data?.filter((p) =>
+                ['succeeded', 'refunded', 'partially_refunded'].includes(p.status),
+              ).length || 0
+            }
+            icon={<FileText />}
+            description="Stvarno evidentirani zapisi"
+          />
+        </div>
+      </QueryState>
+      <div className="payments-overview">
+        <div className="panel">
+          <PaymentMethods compact />
+        </div>
+        <section className="panel">
+          <h2>Iznos za uplatu</h2>
+          <QueryState query={orders}>
+            {pending[0] ? (
+              <>
+                <p>{pending[0].number}</p>
+                <strong className="amount-due">
+                  {money(Math.max(0, (pending[0].total_cents || 0) - pending[0].paid_cents))}
+                </strong>
+                <PaymentRemainder order={pending[0]} admin={admin} />
+              </>
+            ) : (
+              <EmptyState title="Nema narudžbi koje čekaju uplatu" />
+            )}
+          </QueryState>
+        </section>
+      </div>
+      <section className="panel installments-panel">
+        <div className="panel-heading">
+          <h2>Plaćanje na rate 50/50</h2>
+          <span className="service-icon">
+            <Gift size={24} />
+          </span>
+        </div>
+        <QueryState query={orders}>
+          {splitOrder ? (
+            <>
+              <h3>{splitOrder.title}</h3>
+              <OrderStageTimeline order={splitOrder} />
+              <PaymentRemainder order={splitOrder} admin={admin} />
+            </>
+          ) : (
+            <EmptyState
+              title="Nema aktivnih narudžbi s modelom 50/50"
+              description="Opcija je dostupna za usluge i ponude koje je podržavaju."
+            />
+          )}
+        </QueryState>
+      </section>
       <SearchInput
         value={search}
         onChange={setSearch}
         placeholder="Filtriraj status, narudžbu ili pružatelja"
       />
       <div className="panel">
+        <h2>Povijest transakcija</h2>
         <QueryState query={q}>
           {rows.length ? (
             <div className="data-table-wrap">

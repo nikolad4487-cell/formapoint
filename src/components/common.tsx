@@ -1,3 +1,4 @@
+import { BrandMark } from './brand-mark';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -27,13 +28,8 @@ export function ServiceIcon({ name }: { name: string }) {
 export function Logo() {
   return (
     <Link to="/" className="logo" aria-label="FormaPoint početna">
-      <span className="logo-mark">
-        <i />
-        <i />
-        <i />
-      </span>
+      <BrandMark />
       Forma<span>Point</span>
-      <span className="logo-dot" />
     </Link>
   );
 }
@@ -95,7 +91,7 @@ export function ServiceCard({ service }: { service: Service }) {
             : `Od ${money(service.price_cents)}`}
         </span>
         <Link to={`/usluge/${service.slug}`} aria-label={`Saznaj više: ${service.name}`}>
-          <ArrowUpRight size={21} />
+          Saznaj više <ArrowUpRight size={16} />
         </Link>
       </div>
     </article>
@@ -177,16 +173,21 @@ export function StatCard({
   label,
   value,
   icon,
+  tone = 'blue',
+  description,
 }: {
   label: string;
   value: string | number;
   icon?: ReactNode;
+  tone?: string;
+  description?: string;
 }) {
   return (
-    <article className="stat-card">
+    <article className={`stat-card tone-${tone}`}>
       <div>
         <p>{label}</p>
         <strong>{value}</strong>
+        {description && <small>{description}</small>}
       </div>
       <span className="service-icon">{icon || <FileText />}</span>
     </article>

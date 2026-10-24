@@ -1,11 +1,20 @@
+import { WorkspaceIllustration, BrandBenefit } from '../components/brand';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  Zap,
+  ChartNoAxesColumnIncreasing,
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { Unavailable } from '../components/common';
+import { Logo, Unavailable } from '../components/common';
 import { configured, requireDb } from '../lib/supabase';
 const schema = z.object({
   email: z.string(),
@@ -123,26 +132,51 @@ export function AuthPage({
   return (
     <div className="container auth-layout section">
       <aside className="auth-aside">
-        <span className="eyebrow">VAŠ DIGITALNI PARTNER</span>
+        <Logo />
         <h2>
-          Manje obaveza.
+          Digitalne usluge
           <br />
-          <span>Više mogućnosti.</span>
+          <span>na jednom mjestu</span>
         </h2>
-        <p>Sve vaše usluge, narudžbe i datoteke na jednom mjestu.</p>
-        {[
-          'Jasan pregled narudžbi',
-          'Privatne datoteke i komunikacija',
-          'Transparentan dogovor prije izrade',
-        ].map((x) => (
-          <div key={x}>
-            <CheckCircle2 size={18} />
-            {x}
-          </div>
-        ))}
-        <ShieldCheck size={84} className="auth-decoration" />
+        <p>
+          Profesionalni dokumenti, prezentacije i digitalna administracija. Sve narudžbe i dogovori
+          u jednom radnom prostoru.
+        </p>
+        <div className="auth-benefits">
+          <BrandBenefit icon={Zap} title="Brza i jednostavna narudžba" color="violet">
+            Opišite zadatak i dogovorite izradu u nekoliko koraka.
+          </BrandBenefit>
+          <BrandBenefit icon={ShieldCheck} title="Privatni dokumenti" color="green">
+            Vaše datoteke dostupne su ovlaštenim osobama.
+          </BrandBenefit>
+          <BrandBenefit icon={ChartNoAxesColumnIncreasing} title="Sve na jednom mjestu">
+            Organizacija, komunikacija i praćenje narudžbi.
+          </BrandBenefit>
+        </div>
+        <WorkspaceIllustration compact />
       </aside>
       <section className="auth-form">
+        <div className="auth-mobile-logo">
+          <Logo />
+        </div>
+        {(mode === 'login' || registerMode) && (
+          <nav className="auth-tabs" aria-label="Korisnički račun">
+            <Link
+              aria-current={mode === 'login' ? 'page' : undefined}
+              className={mode === 'login' ? 'active' : ''}
+              to="/prijava"
+            >
+              Prijava
+            </Link>
+            <Link
+              aria-current={registerMode ? 'page' : undefined}
+              className={registerMode ? 'active' : ''}
+              to="/registracija"
+            >
+              Registracija
+            </Link>
+          </nav>
+        )}
         <h1>{title}</h1>
         <p>
           {registerMode

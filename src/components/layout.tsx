@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { SupportCard } from './brand';
+import { useEffect, useRef, useState } from 'react';
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Menu,
   X,
@@ -22,6 +23,9 @@ import {
   Tags,
   BookOpen,
   Activity,
+  Layers,
+  Search,
+  ChevronDown,
 } from 'lucide-react';
 import { Logo, LoadingSkeleton, Unavailable } from './common';
 import { Button } from './ui/button';
@@ -36,13 +40,13 @@ export function PublicHeader() {
         <Logo />
         <nav className={open ? 'public-nav open' : 'public-nav'} aria-label="Glavna navigacija">
           {[
+            ['/', 'Početna'],
             ['/usluge', 'Usluge'],
             ['/kako-funkcionira', 'Kako funkcionira'],
             ['/cjenik', 'Cjenik'],
-            ['/o-nama', 'O nama'],
             ['/kontakt', 'Kontakt'],
           ].map(([to, label]) => (
-            <NavLink key={to} to={to} onClick={() => setOpen(false)}>
+            <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)}>
               {label}
             </NavLink>
           ))}
@@ -52,8 +56,8 @@ export function PublicHeader() {
             Prijava <ArrowUpRight size={15} />
           </Link>
           <Button asChild size="sm">
-            <Link to="/app/nova-narudzba">
-              Naruči uslugu <ArrowRight size={15} />
+            <Link to="/registracija">
+              Registracija <ArrowRight size={15} />
             </Link>
           </Button>
           <Button
@@ -114,8 +118,16 @@ export function PublicFooter() {
   );
 }
 export function AppShell() {
+  const { pathname } = useLocation();
+  const auth = [
+    '/prijava',
+    '/registracija',
+    '/zaboravljena-lozinka',
+    '/reset-lozinke',
+    '/potvrda-emaila',
+  ].includes(pathname);
   return (
-    <>
+    <div className={auth ? 'auth-shell' : 'public-shell'}>
       <a href="#sadrzaj" className="skip-link">
         Preskoči na sadržaj
       </a>
@@ -124,7 +136,7 @@ export function AppShell() {
         <Outlet />
       </main>
       <PublicFooter />
-    </>
+    </div>
   );
 }
 export function ProtectedRoute({ admin = false }: { admin?: boolean }) {
@@ -184,12 +196,62 @@ const adminLinks = [
   ['/obavijesti', 'Obavijesti', Bell],
   ['/audit-log', 'Audit log', Shield],
   ['/postavke', 'Postavke', Settings],
+  ['/dizajn-sustav', 'Dizajn-sustav', Layers],
 ] as const;
 export function DashboardLayout({ admin = false }: { admin?: boolean }) {
   const { session, role } = useAuth();
   const [open, setOpen] = useState(false);
   const base = admin ? '/admin' : '/app';
+  const navigate = useNavigate();
+  const sidebar = useRef<HTMLElement>(null);
+  const [mobile, setMobile] = useState(() => window.matchMedia('(max-width:900px)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width:900px)');
+    const change = () => {
+      setMobile(media.matches);
+      if (!media.matches) setOpen(false);
+    };
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
+  }, []);
+  useEffect(() => {
+    if (!open || !mobile) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const selectors = 'a[href],button:not(:disabled),input:not(:disabled)';
+    sidebar.current?.querySelector<HTMLElement>(selectors)?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setOpen(false);
+      }
+      if (event.key === 'Tab') {
+        const nodes = sidebar.current?.querySelectorAll<HTMLElement>(selectors);
+        if (!nodes?.length) return;
+        const first = nodes[0],
+          last = nodes[nodes.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('keydown', key);
+      document.body.style.overflow = overflow;
+      previous?.focus();
+    };
+  }, [open, mobile]);
   const location = useLocation();
+  const name =
+    [session?.user.user_metadata.first_name, session?.user.user_metadata.last_name]
+      .filter(Boolean)
+      .join(' ') || 'Moj račun';
   return (
     <div className="dashboard">
       <a className="skip-link" href="#sadrzaj">
@@ -202,7 +264,25 @@ export function DashboardLayout({ admin = false }: { admin?: boolean }) {
           onClick={() => setOpen(false)}
         />
       )}
-      <aside className={`sidebar ${open ? 'open' : ''}`}>
+      <aside
+        ref={sidebar}
+        className={`sidebar ${open ? 'open' : ''}`}
+        inert={mobile && !open}
+        role={mobile ? 'dialog' : undefined}
+        aria-modal={mobile && open ? true : undefined}
+        aria-label="Navigacija radnog prostora"
+      >
+        {mobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="sidebar-close"
+            aria-label="Zatvori navigaciju"
+            onClick={() => setOpen(false)}
+          >
+            <X />
+          </Button>
+        )}
         <Logo />
         <span className="sidebar-label">{admin ? 'RADNI PROSTOR' : 'MOJ FORMAPOINT'}</span>
         <nav aria-label="Korisnička navigacija">
@@ -213,6 +293,7 @@ export function DashboardLayout({ admin = false }: { admin?: boolean }) {
             </NavLink>
           ))}
         </nav>
+        <SupportCard admin={admin} />
         <div className="sidebar-bottom">
           {role === 'ADMIN' && (
             <Link to={admin ? '/app' : '/admin'}>
@@ -243,12 +324,45 @@ export function DashboardLayout({ admin = false }: { admin?: boolean }) {
           >
             <Menu />
           </Button>
-          <span>{admin ? 'Administracija' : 'Vaš digitalni radni prostor'}</span>
+          <form
+            className="header-search"
+            role="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const value = String(new FormData(e.currentTarget).get('q') || '');
+              navigate(`${base}/narudzbe?q=${encodeURIComponent(value)}`);
+            }}
+          >
+            <Search size={21} />
+            <label className="sr-only" htmlFor="workspace-search">
+              Pretraži narudžbe
+            </label>
+            <input
+              id="workspace-search"
+              name="q"
+              type="search"
+              placeholder={
+                admin ? 'Pretraži narudžbe po nazivu ili broju…' : 'Pretraži svoje narudžbe…'
+              }
+            />
+          </form>
           <div>
             <Link aria-label="Obavijesti" to={`${base}/obavijesti`}>
               <Bell size={20} />
             </Link>
-            <span className="avatar">{session?.user.email?.slice(0, 1).toUpperCase()}</span>
+            <Link className="account-link" to={admin ? '/admin/postavke' : '/app/profil'}>
+              <span className="avatar">
+                {name === 'Moj račun'
+                  ? session?.user.email?.slice(0, 1).toUpperCase()
+                  : name
+                      .split(' ')
+                      .map((x) => x[0])
+                      .slice(0, 2)
+                      .join('')}
+              </span>
+              <strong>{name}</strong>
+              <ChevronDown size={16} />
+            </Link>
           </div>
         </header>
         <main id="sadrzaj" key={location.pathname} className="dashboard-content">

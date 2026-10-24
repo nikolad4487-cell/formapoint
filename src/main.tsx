@@ -1,3 +1,4 @@
+import { DesignSystemPage } from './pages/design-system';
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
@@ -35,6 +36,7 @@ import {
   AdminSupport,
 } from './pages/admin';
 import './index.css';
+import './reference.css';
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15000, retry: 1, refetchOnWindowFocus: true } },
 });
@@ -142,6 +144,7 @@ function App() {
             <Route path="audit-log" element={<AuditPage />} />
             <Route path="izvjestaji" element={<ReportsPage />} />
             <Route path="postavke" element={<AdminSettings />} />
+            <Route path="dizajn-sustav" element={<DesignSystemPage />} />
             <Route path="poruke" element={<MessagesPage admin />} />
             <Route path="poruke/:id" element={<MessagesPage admin />} />
             <Route path="datoteke" element={<FilesPage />} />

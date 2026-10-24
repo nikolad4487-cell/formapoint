@@ -1,3 +1,5 @@
+import { WorkspaceIllustration, BrandBenefit } from '../components/brand';
+import { PaymentMethods } from '../components/payment-methods';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
@@ -7,9 +9,6 @@ import {
   Clock3,
   MessagesSquare,
   Layers,
-  FileText,
-  Presentation,
-  Table2,
   Sparkles,
   CheckCircle2,
   LockKeyhole,
@@ -78,13 +77,13 @@ export function HomePage() {
         <div className="container hero-grid">
           <div className="hero-copy">
             <span className="hero-pill">
-              <span />
-              VAŠ DIGITALNI PARTNER
+              <Sparkles size={15} />
+              Vaš partner za digitalne i administrativne usluge
             </span>
             <h1>
               Digitalne usluge
               <br />
-              na <span>jednom mjestu.</span>
+              <span>na jednom mjestu</span>
             </h1>
             <p>
               Profesionalna izrada i uređivanje dokumenata, prezentacija, obrazaca i
@@ -113,139 +112,14 @@ export function HomePage() {
               </span>
             </div>
           </div>
-          <div className="hero-art" aria-label="Ilustracija digitalnog radnog prostora">
-            <div className="art-orbit orbit-one" />
-            <div className="art-orbit orbit-two" />
-            <span className="art-dot dot-one" />
-            <span className="art-dot dot-two" />
-            <div className="floating-icon word-icon">
-              <FileText />
-            </div>
-            <div className="floating-icon excel-icon">
-              <Table2 />
-            </div>
-            <div className="floating-icon ppt-icon">
-              <Presentation />
-            </div>
-            <div className="workspace-illustration">
-              <div className="workspace-top">
-                <span className="mini-logo">
-                  F<span>p</span>
-                </span>
-                <span>VAŠ RADNI PROSTOR</span>
-                <span className="window-dots">•••</span>
-              </div>
-              <div className="workspace-body">
-                <span className="mini-eyebrow">OD IDEJE DO GOTOVOG RJEŠENJA</span>
-                <h3>Sve na svom mjestu.</h3>
-                <div className="illustrated-document">
-                  <div className="document-icon">
-                    <FileText size={28} />
-                  </div>
-                  <div>
-                    <strong>Vaš sljedeći projekt</strong>
-                    <span>Jednostavnije uz FormaPoint</span>
-                  </div>
-                  <span className="document-check">
-                    <Check size={16} />
-                  </span>
-                </div>
-                <div className="art-lines">
-                  <i />
-                  <i />
-                  <i />
-                </div>
-                <div className="illustration-steps">
-                  <span className="done">
-                    <Check size={12} />
-                  </span>
-                  <i />
-                  <span className="done">
-                    <Check size={12} />
-                  </span>
-                  <i />
-                  <span>3</span>
-                </div>
-                <div className="illustration-labels">
-                  <span>Vaša ideja</span>
-                  <span>Naša stručnost</span>
-                  <span>Vaš rezultat</span>
-                </div>
-              </div>
-            </div>
-            <div className="floating-note">
-              <span>
-                <Sparkles size={19} />
-              </span>
-              <div>
-                <strong>Manje zadataka za vas.</strong>
-                <small>Više prostora za ono što volite.</small>
-              </div>
-            </div>
-            <span className="art-caption">Vi zamislite. Mi oblikujemo.</span>
-          </div>
+          <WorkspaceIllustration />
         </div>
       </section>
-      <div className="trust-strip">
-        <div className="container">
-          <span>PODRŠKA ZA VAŠ SVAKI DAN</span>
-          <span>
-            <FileText />
-            Dokumenti
-          </span>
-          <span>
-            <Presentation />
-            Prezentacije
-          </span>
-          <span>
-            <Table2 />
-            Tablice
-          </span>
-          <span>
-            <Layers />
-            Digitalna administracija
-          </span>
-        </div>
-      </div>
-      <section className="container section">
-        <SectionTitle
-          eyebrow="MANJE KOMPLIKACIJA, VIŠE REZULTATA"
-          title="Vi se fokusirajte na bitno."
-          description="Digitalne zadatke prepustite pouzdanoj podršci."
-        />
-        <div className="benefit-grid">
-          {[
-            {
-              Icon: Clock3,
-              title: 'Uštedite svoje vrijeme',
-              text: 'Od sitnih dorada do opsežnijih zadataka. Oslobodite vrijeme za svoje prioritete.',
-            },
-            {
-              Icon: ShieldCheck,
-              title: 'Sigurno i transparentno',
-              text: 'Dogovorena cijena, privatne datoteke i jasan pregled svakog koraka.',
-            },
-            {
-              Icon: MessagesSquare,
-              title: 'Uvijek u kontaktu',
-              text: 'Sve upute, poruke i datoteke na jednom mjestu. Bez izgubljenih dogovora.',
-            },
-          ].map(({ Icon, title, text }) => (
-            <article key={title} className="benefit">
-              <span>
-                <Icon size={23} />
-              </span>
-              <h3>{title}</h3>
-              <p>{text}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="section section-tinted">
+      <section className="section section-tinted home-services">
         <div className="container">
           <SectionTitle
-            eyebrow="ŠTO MOŽEMO UČINITI ZA VAS"
-            title="Prava podrška za svaki zadatak."
+            eyebrow="NAŠE USLUGE"
+            title="Što možemo napraviti za vas?"
             description="Od prvog dokumenta do svakodnevne administracije."
             action={
               <Link to="/usluge">
@@ -259,9 +133,12 @@ export function HomePage() {
             <ErrorState retry={() => void q.refetch()} />
           ) : (
             <div className="service-grid">
-              {q.data.slice(0, 6).map((s) => (
-                <ServiceCard key={s.id} service={s} />
-              ))}
+              {q.data
+                .filter((s) => !['excel', 'individualni-zahtjev'].includes(s.slug))
+                .slice(0, 5)
+                .map((s) => (
+                  <ServiceCard key={s.id} service={s} />
+                ))}
             </div>
           )}
           <div className="individual-banner">
@@ -278,6 +155,29 @@ export function HomePage() {
           </div>
         </div>
       </section>
+      <div className="container">
+        <PaymentMethods />
+      </div>
+      <section className="container reference-benefits section">
+        <SectionTitle
+          eyebrow="ZAŠTO ODABRATI FORMAPOINT"
+          title="Vaše zadovoljstvo je na prvom mjestu"
+        />
+        <div className="reference-benefit-grid">
+          <BrandBenefit icon={Clock3} title="Jasan rok izrade" color="violet">
+            Dogovorite rok i opseg zadatka prije početka.
+          </BrandBenefit>
+          <BrandBenefit icon={ShieldCheck} title="Privatne datoteke" color="green">
+            Kontroliran pristup vašim dokumentima.
+          </BrandBenefit>
+          <BrandBenefit icon={Layers} title="Praćenje narudžbe">
+            Status izrade i dogovori na jednom mjestu.
+          </BrandBenefit>
+          <BrandBenefit icon={MessagesSquare} title="Podrška" color="violet">
+            Tu smo za pitanja i dodatne zahtjeve.
+          </BrandBenefit>
+        </div>
+      </section>{' '}
       <section className="container section">
         <SectionTitle
           eyebrow="JEDNOSTAVNO OD POČETKA DO KRAJA"
