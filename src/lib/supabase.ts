@@ -1,7 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
-const url = import.meta.env.VITE_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const configured = Boolean(url && key);
+import publicConfig from '../config/supabase.public.json';
+import { resolveSupabaseConfig } from './supabase-config';
+const {
+  url,
+  key,
+  configured: ready,
+} = resolveSupabaseConfig(
+  {
+    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+    VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    VITE_SUPABASE_DISABLED: import.meta.env.VITE_SUPABASE_DISABLED,
+  },
+  publicConfig,
+);
+export const configured = ready;
 export const db = configured
   ? createClient(url, key, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },

@@ -42,7 +42,12 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev -- --host 127.0.0.1 --port 5174',
-      env: { VITE_SUPABASE_URL: '', VITE_SUPABASE_PUBLISHABLE_KEY: '', VITE_SUPABASE_ANON_KEY: '' },
+      env: {
+        VITE_SUPABASE_DISABLED: 'true',
+        VITE_SUPABASE_URL: '',
+        VITE_SUPABASE_PUBLISHABLE_KEY: '',
+        VITE_SUPABASE_ANON_KEY: '',
+      },
       url: 'http://127.0.0.1:5174',
       reuseExistingServer: !process.env.CI,
       timeout: 30000,
@@ -50,6 +55,7 @@ export default defineConfig({
     {
       command: 'npm run dev -- --host 127.0.0.1 --port 5175',
       env: {
+        VITE_SUPABASE_DISABLED: 'false',
         VITE_SUPABASE_URL: 'http://127.0.0.1:54321',
         VITE_SUPABASE_PUBLISHABLE_KEY: 'browser-test-public-key',
         VITE_SUPABASE_ANON_KEY: '',

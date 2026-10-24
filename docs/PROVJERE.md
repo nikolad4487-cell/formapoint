@@ -5,7 +5,7 @@ Provjereno 24. listopada 2026. na Node.js 24, Linuxu, Chromiumu i PostgreSQL-u 1
 | Provjera                               | Rezultat                           | Što dokazuje                                                                                                                                                                                                  |
 | -------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | TypeScript i Vite produkcijski build   | Prošlo                             | Frontend se kompajlira; bundle je podijeljen na aplikaciju, vendor, Supabase, obrasce i datume                                                                                                                |
-| Vitest                                 | 22 prošla testa                    | 50/50 centi, cijeli brojevi, popusti, EUR prikaz i pravila pristupa završnom radu                                                                                                                             |
+| Vitest                                 | 31 prošao test                     | 50/50 centi, popusti, pristup završnom radu te fallback, override, offline način i zabrana serverskog ključa u javnoj konfiguraciji                                                                           |
 | PostgreSQL migracije                   | 5 uspješno primijenjenih           | Sintaktička i izvršna valjanost tablica, funkcija, politika, seed kataloga i hardeninga                                                                                                                       |
 | PostgreSQL integracija                 | 43 prošle provjere                 | RLS, zabrana eskalacije uloge i upisa uplate, privatnost poruka, kupon, verzije ponuda, zaključana cijena, rate, ponovljeni i zakašnjeli događaji, neuspjele uplate i povrati                                 |
 | Playwright javni dio                   | 9 prošlih, 1 očekivano preskočen   | Desktop/mobilni katalog i detalji, pretraživanje, FAQ tipkovnicom, glavne javne rute bez horizontalnog overflowa, stvarna nedostupnost prijave bez konfiguracije; mobilni test se preskače u desktop projektu |
@@ -24,3 +24,11 @@ Na aktualnom stroju javni razvoj i build rade. Za puni backend potrebno je pove�
 Neopasne build napomene dolaze iz Zod dependency komentara o tree-shakingu. Ne isključuju se provjere TLS-a, potpisa ni checksumova.
 
 Nakon vizualnog usklađenja: Playwright ukupno 26 prošlih provjera i 2 očekivano preskočene (mobilni izbornici u desktop projektima). Od toga je 17 dodatnih provjera privatnih prikaza s izoliranim API fixtureom. To nije potvrda stvarne Auth/Storage/Stripe integracije. Više u [DIZAJN.md](DIZAJN.md).
+
+## Ispravak konfiguracije objavljene aplikacije
+
+Produkcijski build uspješno je izrađen i uz uklonjene `VITE_SUPABASE_*` varijable: koristi spremljeni javni URL i `anon` ključ projekta. Build provjera blokira serverske ključeve prije kompilacije i provjerava da serverski ključ i administratorska lozinka nisu ugrađeni u JavaScript izlaz.
+
+Na lokalno posluženom produkcijskom buildu provjereni su omogućeni obrazac prijave, stvarna administratorska prijava, otvaranje `/admin` i odjava prema hostanom Supabase projektu. HTTP zahtjevi browser provjere proslijeđeni su stvarnom API-ju kroz postojeći TLS-verificirani curl/proxy transport zbog Chromiumove odvojene CA pohrane; nisu korišteni mock odgovori ni isključivanje TLS provjere. Ovo nije provjera isporuke novog deploya na `www.formapoint.online`.
+
+Ranije je na hostanom projektu zasebno potvrđeno postojanje profila i uloge ADMIN, RPC provjera ovlasti te sedam aktivnih usluga. Stripe naplata, reset e-maila i objava Edge funkcija time nisu potvrđeni.

@@ -14,7 +14,7 @@ npm ci --cache /tmp/formapoint-npm
 npm run dev
 ```
 
-Bez Supabase varijabli radi javni katalog bez izmišljenih cijena. Prijava, privatni podaci, kontakt i naplata prikazuju stvarnu nedostupnost. Ne postoji lokalna lažna prijava ili simulirana produkcijska uplata.
+Aplikacija zadano koristi javnu konfiguraciju FormaPoint Supabase projekta iz `src/config/supabase.public.json`, pa objava s GitHuba radi i bez dodatnih hosting varijabli. Datoteka sadrži samo javni `anon` ključ, bez administratorskih tajni. Za drugi projekt postavite zajedno `VITE_SUPABASE_URL` i `VITE_SUPABASE_PUBLISHABLE_KEY` (ili `VITE_SUPABASE_ANON_KEY`). Prazne varijable tretiraju se kao nedostajuće; djelomični par ne preuzima ključ iz drugog projekta. Za namjerni način rada bez baze postavite `VITE_SUPABASE_DISABLED=true`. Ne postoji lažna prijava ili simulirana produkcijska uplata.
 
 ## Lokalni Supabase
 
@@ -58,7 +58,7 @@ Servisi se ne mogu smatrati trajno pokrenutima nakon obnove cloud okruženja. Po
 
 ```bash
 npm run build            # TypeScript i produkcijski bundle
-npm test                 # 22 testa novca i domenskih pravila
+npm test                 # domenska pravila i regresijske provjere javne konfiguracije
 npm run db:test          # Docker PostgreSQL, migracije i 43 serverske provjere
 npm run test:e2e          # javni i fixture privatni tokovi; portovi 5174 i 5175
 npm run check:edge       # Deno provjera svih 6 Edge funkcija
@@ -74,7 +74,7 @@ Playwright koristi `/usr/bin/chromium` ako postoji ili `PLAYWRIGHT_CHROMIUM_EXEC
 
 `npm run build` stvara `dist/`. Statički hosting mora preusmjeriti nepoznate putanje na `index.html`; uključen je Netlify `_redirects`. Na drugom hostingu postavite jednak SPA fallback i sigurnosna zaglavlja (CSP prilagođen stvarnom Supabase hostu, HSTS, nosniff, frame-ancestors). Vite razvojni server nije produkcijski hosting.
 
-Frontend varijable postavljaju se pri buildu. Tajne ostaju u Supabase Secrets. U postavkama cloud okruženja dopustite točan Supabase hostname i, za serverske operacije, `api.stripe.com` i po potrebi `api.resend.com`. Nemojte isključivati TLS provjeru ili dodavati neograničen izlaz kao popravak.
+Frontend override varijable postavljaju se pri buildu; bez njih koristi se spremljena javna konfiguracija projekta. Promjena hosting varijabli zahtijeva novi deploy. Build provjerava da je ključ javni i da serverske tajne nisu ugrađene u izlazne JavaScript datoteke. Tajne ostaju u Supabase Secrets. U postavkama cloud okruženja dopustite točan Supabase hostname i, za serverske operacije, `api.stripe.com` i po potrebi `api.resend.com`. Nemojte isključivati TLS provjeru ili dodavati neograničen izlaz kao popravak.
 
 Prije objave vlasnik mora unijeti stvarne poslovne podatke, cijene i pravila, odobriti pravne tekstove, postaviti rokove čuvanja/brisanja, backup i monitoring te povezati usklađeno izdavanje računa/fiskalizaciju. Interna evidencija nije službeni račun. Automatski antivirus, PayPal, bankovni workflow i CorvusPay nisu završeni; vidjeti STATUS.
 
