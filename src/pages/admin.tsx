@@ -1,3 +1,4 @@
+import { eurosToCents } from '../lib/currency';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -287,7 +288,10 @@ export function CouponsPage() {
               .insert({
                 code: String(f.get('code')).trim().toUpperCase(),
                 kind: f.get('kind'),
-                value: Number(f.get('value')),
+                value:
+                  f.get('kind') === 'fixed'
+                    ? eurosToCents(String(f.get('value')), 1)
+                    : Number(f.get('value')),
                 max_uses: Number(f.get('max')),
                 expires_at: new Date(String(f.get('expires'))).toISOString(),
               });
@@ -306,14 +310,20 @@ export function CouponsPage() {
             Vrsta
             <select name="kind">
               <option value="percent">Postotni</option>
-              <option value="fixed">Fiksni iznos u centima</option>
+              <option value="fixed">Fiksni iznos (€)</option>
             </select>
           </label>
         </div>
         <div className="form-row">
           <label>
             Vrijednost
-            <input name="value" required type="number" min={1} />
+            <input
+              name="value"
+              required
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]+([.,][0-9]{1,2})?"
+            />
           </label>
           <label>
             Najviše korištenja

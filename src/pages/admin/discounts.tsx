@@ -1,3 +1,5 @@
+import { EuroInput } from '../../components/euro-input';
+import { eurosToCents } from '../../lib/currency';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
@@ -34,6 +36,7 @@ export function DiscountsAdmin() {
     [customer, setCustomer] = useState(''),
     [audience, setAudience] = useState('all'),
     [busy, setBusy] = useState(false);
+  const [discountKind, setDiscountKind] = useState('percent');
   const [updating, setUpdating] = useState('');
   async function changeFirstOrder(id: string, enabled: boolean) {
     setUpdating(id);
@@ -74,6 +77,7 @@ export function DiscountsAdmin() {
             onClick={() => {
               setOpen(true);
               setAudience('all');
+              setDiscountKind('percent');
               setCustomer('');
             }}
           >
@@ -178,7 +182,8 @@ export function DiscountsAdmin() {
             const ok = await action(async () => {
               if (specific && !customer) throw new Error('Odaberite korisnika.');
               const kind = field(f, 'kind'),
-                value = Number(field(f, 'value'));
+                value =
+                  kind === 'fixed' ? eurosToCents(field(f, 'value'), 1) : Number(field(f, 'value'));
               if (kind === 'percent' && value > 100)
                 throw new Error('Popust ne može biti veći od 100 %.');
               const { error } = await requireDb()
@@ -212,14 +217,30 @@ export function DiscountsAdmin() {
           <div className="form-row">
             <label>
               Vrsta
-              <select name="kind">
+              <select
+                name="kind"
+                value={discountKind}
+                onChange={(e) => setDiscountKind(e.target.value)}
+              >
                 <option value="percent">Postotak</option>
-                <option value="fixed">Fiksni iznos u centima</option>
+                <option value="fixed">Fiksni iznos (€)</option>
               </select>
             </label>
             <label>
-              Vrijednost
-              <input name="value" required type="number" min={1} />
+              {discountKind === 'fixed' ? 'Iznos popusta (€)' : 'Vrijednost (%)'}
+              {discountKind === 'fixed' ? (
+                <EuroInput key="fixed" name="value" required />
+              ) : (
+                <input
+                  key="percent"
+                  name="value"
+                  required
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                />
+              )}
             </label>
           </div>
           <div className="form-row">

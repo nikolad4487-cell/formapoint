@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { workspaceFixture } from '../fixtures/workspace';
+import { workspaceFixture, fixtureOrders } from '../fixtures/workspace';
 test.beforeEach(async ({ page }) => workspaceFixture(page, { admin: true }));
 test('postavke spremaju i prazni kontakt bez prepisivanja ostalih odjeljaka', async ({ page }) => {
   await page.goto('/admin/postavke');
@@ -139,13 +139,11 @@ test('ikona kartice se učitava kao PNG i može ukloniti bez unosa poveznice', a
   const upload = page.waitForRequest(
     (r) => r.method() === 'POST' && r.url().includes('/storage/v1/object/payment-icons/visa/'),
   );
-  await page
-    .getByLabel('Učitaj ikonu Visa', { exact: true })
-    .setInputFiles({
-      name: 'visa.jpg',
-      mimeType: 'image/jpeg',
-      buffer: Buffer.from(sourceImage, 'base64'),
-    });
+  await page.getByLabel('Učitaj ikonu Visa', { exact: true }).setInputFiles({
+    name: 'visa.jpg',
+    mimeType: 'image/jpeg',
+    buffer: Buffer.from(sourceImage, 'base64'),
+  });
   const uploadedRequest = await upload;
   const multipart = await new Response(uploadedRequest.postDataBuffer(), {
     headers: { 'Content-Type': uploadedRequest.headers()['content-type'] },
@@ -165,7 +163,7 @@ test('novi popust sprema uvjet da kupac nema prethodnih narudžbi', async ({ pag
   await page.getByRole('button', { name: 'Novi popust' }).click();
   await page.getByLabel('Naziv predloška').fill('Dobrodošlica');
   await page.getByLabel('Kod', { exact: true }).fill('PRVI20');
-  await page.getByLabel('Vrijednost', { exact: true }).fill('20');
+  await page.getByLabel('Vrijednost (%)', { exact: true }).fill('20');
   await page.getByLabel('Najviše korištenja').fill('100');
   await page.getByLabel('Vrijedi do').fill('2027-12-31T23:59');
   await page.getByLabel('Kome vrijedi popust?').selectOption('new');
@@ -187,4 +185,71 @@ test('novi popust sprema uvjet da kupac nema prethodnih narudžbi', async ({ pag
   await page.getByRole('checkbox', { name: 'Samo novi korisnici za kupon PRVI20' }).uncheck();
   expect((await changed).postDataJSON()).toMatchObject({ first_order_only: false });
   await expect(page.getByText('Za sve korisnike', { exact: true })).toBeVisible();
+});
+test('cijena usluge i prag 50/50 unose se u eurima', async ({ page }) => {
+  await page.goto('/admin/usluge');
+  await page.getByRole('button', { name: 'Uredi', exact: true }).first().click();
+  const price = page.getByLabel('Cijena (€; prazno za individualnu ponudu)', { exact: true });
+  await expect(price).toHaveValue('25,01');
+  await price.fill('31,25');
+  await page.getByLabel('Minimalni iznos za 50/50 (€)', { exact: true }).fill('20,00');
+  const saved = page.waitForRequest(
+    (r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/services'),
+  );
+  await page.getByRole('button', { name: 'Spremi uslugu', exact: true }).click();
+  expect((await saved).postDataJSON()).toMatchObject({ price_cents: 3125, split_min_cents: 2000 });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+test('fiksni popust prihvaća iznos u eurima', async ({ page }) => {
+  await page.goto('/admin/kuponi');
+  await page.getByRole('button', { name: 'Novi popust', exact: true }).click();
+  await page.getByLabel('Naziv predloška').fill('Popust u eurima');
+  await page.getByLabel('Kod', { exact: true }).fill('EURO750');
+  await page.getByRole('combobox', { name: 'Vrsta', exact: true }).selectOption('fixed');
+  await page.getByLabel('Iznos popusta (€)', { exact: true }).fill('7,50');
+  await page.getByLabel('Najviše korištenja').fill('100');
+  await page.getByLabel('Vrijedi do').fill('2027-12-31T23:59');
+  const saved = page.waitForRequest(
+    (r) => r.method() === 'POST' && r.url().includes('/rest/v1/promo_codes'),
+  );
+  await page.getByRole('button', { name: 'Izradi popust' }).click();
+  expect((await saved).postDataJSON()).toMatchObject({ kind: 'fixed', value: 750 });
+  await expect(page.locator('.coupon-code')).toHaveText('EURO750');
+});
+test('ponuda prima cijenu u eurima i šalje precizan iznos', async ({ page }) => {
+  await page.route('**/rest/v1/orders*', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([
+        { ...fixtureOrders[0], status: 'quote_pending', total_cents: null, paid_cents: 0 },
+      ]),
+    }),
+  );
+  await page.goto('/admin/narudzbe/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  await page.getByRole('button', { name: 'Izradi ponudu', exact: true }).click();
+  await page.getByLabel('Opis i uvjeti').fill('Opseg i uvjeti nove ponude za korisnika.');
+  await page.getByLabel('Konačna cijena (€)', { exact: true }).fill('123,45');
+  await page.getByLabel('Vrijedi do').fill('2027-11-20T12:00');
+  await page.getByLabel('Rok isporuke').fill('2027-12-01T12:00');
+  const saved = page.waitForRequest((r) => r.url().includes('/rpc/create_quote'));
+  await page.getByRole('button', { name: 'Spremi i pošalji ponudu' }).click();
+  expect((await saved).postDataJSON()).toMatchObject({ p_total: 12345 });
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('CSV izvoz transakcija prikazuje iznose i naknade u eurima', async ({ page }) => {
+  await page.goto('/admin/placanja');
+  await expect(page.locator('.data-table')).toContainText('12,51');
+  const pending = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Izvoz CSV' }).click();
+  const download = await pending;
+  const csv = await readFile((await download.path())!, 'utf8');
+  expect(csv).toContain('Bruto (EUR)');
+  expect(csv).toContain('"12,51";"0,00";"0,42"');
 });

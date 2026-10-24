@@ -1,3 +1,5 @@
+import { EuroInput } from '../components/euro-input';
+import { eurosToCents, centsToEuroInput } from '../lib/currency';
 import { AdminDashboardExtras } from './admin/overview';
 import {
   OrderStageTimeline,
@@ -874,7 +876,7 @@ function QuoteForm({ orderId, done }: { orderId: string; done: () => void }) {
           await rpc('create_quote', {
             p_order: orderId,
             p_description: f.get('description'),
-            p_total: Number(f.get('cents')),
+            p_total: eurosToCents(String(f.get('price')), 100),
             p_expires: new Date(String(f.get('expires'))).toISOString(),
             p_due: new Date(String(f.get('due'))).toISOString(),
             p_split: f.get('split') === 'on',
@@ -890,8 +892,8 @@ function QuoteForm({ orderId, done }: { orderId: string; done: () => void }) {
         <textarea name="description" required minLength={10} maxLength={10000} />
       </label>
       <label>
-        Konačna cijena u centima
-        <input name="cents" type="number" min={100} max={100000000} required />
+        Konačna cijena (€)
+        <EuroInput name="price" required />
       </label>
       <label>
         Vrijedi do
@@ -1492,9 +1494,9 @@ export function PaymentsPage({ admin = false }: { admin?: boolean }) {
         [
           'ID',
           'Narudžba',
-          'Bruto centi',
-          'Refundirano centi',
-          'Naknada centi',
+          'Bruto (EUR)',
+          'Refundirano (EUR)',
+          'Naknada (EUR)',
           'Status',
           'Pružatelj',
           'Vrijeme',
@@ -1502,9 +1504,9 @@ export function PaymentsPage({ admin = false }: { admin?: boolean }) {
         ...rows.map((p) => [
           p.id,
           p.order_id,
-          p.amount_cents,
-          p.refunded_cents,
-          p.fee_cents,
+          centsToEuroInput(p.amount_cents),
+          centsToEuroInput(p.refunded_cents),
+          centsToEuroInput(p.fee_cents),
           p.status,
           p.provider,
           p.created_at,
@@ -2134,23 +2136,25 @@ export function ServiceEditor({
       onSubmit={async (e) => {
         e.preventDefault();
         const f = new FormData(e.currentTarget);
-        const fields = {
-          name: String(f.get('name')),
-          slug: String(f.get('slug')),
-          description: String(f.get('description')),
-          category: String(f.get('category')),
-          icon: String(f.get('icon')),
-          price_cents: f.get('price') ? Number(f.get('price')) : null,
-          delivery_days: Number(f.get('days')),
-          revisions: Number(f.get('revisions')),
-          split_enabled: f.get('split') === 'on',
-          split_min_cents: Number(f.get('min')),
-          active: f.get('active') === 'on',
-          included: String(f.get('included')).split('\n').filter(Boolean),
-          excluded: String(f.get('excluded')).split('\n').filter(Boolean),
-        };
         setBusy(true);
         const ok = await action(async () => {
+          const fields = {
+            name: String(f.get('name')),
+            slug: String(f.get('slug')),
+            description: String(f.get('description')),
+            category: String(f.get('category')),
+            icon: String(f.get('icon')),
+            price_cents: String(f.get('price') || '').trim()
+              ? eurosToCents(String(f.get('price')), 100)
+              : null,
+            delivery_days: Number(f.get('days')),
+            revisions: Number(f.get('revisions')),
+            split_enabled: f.get('split') === 'on',
+            split_min_cents: eurosToCents(String(f.get('min')), 200),
+            active: f.get('active') === 'on',
+            included: String(f.get('included')).split('\n').filter(Boolean),
+            excluded: String(f.get('excluded')).split('\n').filter(Boolean),
+          };
           const db = requireDb();
           const { error } = await (service
             ? db.from('services').update(fields).eq('id', service.id)
@@ -2201,14 +2205,8 @@ export function ServiceEditor({
         <textarea name="excluded" defaultValue={service?.excluded.join('\n')} />
       </label>
       <label>
-        Cijena u centima (prazno za individualnu ponudu)
-        <input
-          type="number"
-          name="price"
-          min={100}
-          max={100000000}
-          defaultValue={service?.price_cents ?? ''}
-        />
+        Cijena (€; prazno za individualnu ponudu)
+        <EuroInput name="price" defaultCents={service?.price_cents} />
       </label>
       <div className="form-row">
         <label>
@@ -2237,14 +2235,8 @@ export function ServiceEditor({
         Dopusti 50/50
       </label>
       <label>
-        Minimalni iznos za 50/50 u centima
-        <input
-          name="min"
-          type="number"
-          min={200}
-          required
-          defaultValue={service?.split_min_cents || 10000}
-        />
+        Minimalni iznos za 50/50 (€)
+        <EuroInput name="min" defaultCents={service?.split_min_cents ?? 10000} required />
       </label>
       <label className="checkbox">
         <input name="active" type="checkbox" defaultChecked={service?.active ?? true} />

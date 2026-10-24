@@ -498,7 +498,7 @@ export function InfoPage({ kind }: { kind: string }) {
           ['Pratite izradu', 'Nakon potvrđene početne uplate pratite status i šaljite poruke.'],
           [
             'Preuzmite rezultat',
-            'Završne datoteke dostupne su nakon ukupne uplate. Kod neparnog broja centi prva rata sadrži dodatni cent.',
+            'Završne datoteke dostupne su nakon ukupne uplate. Ako iznos nije moguće podijeliti na dvije jednake rate, prva rata može biti veća za 0,01 €.',
           ],
         ].map(([t, d], i) => (
           <article className="how-step" key={t}>
