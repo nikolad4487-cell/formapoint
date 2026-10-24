@@ -72,7 +72,7 @@ Playwright koristi `/usr/bin/chromium` ako postoji ili `PLAYWRIGHT_CHROMIUM_EXEC
 
 ## Objava i preduvjeti poslovanja
 
-`npm run build` stvara `dist/`. Statički hosting mora preusmjeriti nepoznate putanje na `index.html`; uključen je Netlify `_redirects`. Na drugom hostingu postavite jednak SPA fallback i sigurnosna zaglavlja (CSP prilagođen stvarnom Supabase hostu, HSTS, nosniff, frame-ancestors). Vite razvojni server nije produkcijski hosting.
+`npm run build` stvara `dist/`. Uključen je `vercel.json` s Vite buildom i SPA preusmjeravanjem na `index.html`, tako da izravno otvaranje i osvježavanje `/admin/postavke`, `/prijava` i ostalih React Router putanja radi na Vercelu. Postojeće statičke datoteke poslužuju se prije ovog fallbacka. Za Netlify uključen je `_redirects`. Na drugom hostingu postavite jednak SPA fallback i sigurnosna zaglavlja (CSP prilagođen stvarnom Supabase hostu, HSTS, nosniff, frame-ancestors). Vite razvojni server nije produkcijski hosting.
 
 Frontend override varijable postavljaju se pri buildu; bez njih koristi se spremljena javna konfiguracija projekta. Promjena hosting varijabli zahtijeva novi deploy. Build provjerava da je ključ javni i da serverske tajne nisu ugrađene u izlazne JavaScript datoteke. Tajne ostaju u Supabase Secrets. U postavkama cloud okruženja dopustite točan Supabase hostname i, za serverske operacije, `api.stripe.com` i po potrebi `api.resend.com`. Nemojte isključivati TLS provjeru ili dodavati neograničen izlaz kao popravak.
 
