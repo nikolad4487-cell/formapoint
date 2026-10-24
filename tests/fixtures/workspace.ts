@@ -136,6 +136,7 @@ export async function workspaceFixture(
     newsletter_deliveries: [],
     promo_codes: [],
   };
+  const uploadedIcons = new Map<string, Buffer>();
   await page.route('http://127.0.0.1:54321/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -148,6 +149,36 @@ export async function workspaceFixture(
     };
     if (request.method() === 'OPTIONS') {
       await route.fulfill({ status: 204, headers });
+      return;
+    }
+    if (url.pathname.startsWith('/storage/v1/object/public/payment-icons/')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body:
+          uploadedIcons.get(url.pathname.replace('/object/public/', '/object/')) || Buffer.alloc(0),
+      });
+      return;
+    }
+    if (url.pathname.startsWith('/storage/v1/object/payment-icons/')) {
+      const data = await new Response(request.postDataBuffer(), {
+        headers: { 'Content-Type': request.headers()['content-type'] },
+      }).formData();
+      const image = [...data.values()].find((v) => typeof v !== 'string') as File;
+      uploadedIcons.set(url.pathname, Buffer.from(await image.arrayBuffer()));
+      await route.fulfill({
+        status: 200,
+        headers,
+        body: JSON.stringify({ Key: url.pathname.split('/object/')[1], Id: 'test-icon' }),
+      });
+      return;
+    }
+    if (table === 'set_payment_icon') {
+      const body = request.postDataJSON();
+      const icons = adminTables.site_settings[0].payment_icons as Record<string, string>;
+      if (body.p_url === null) delete icons[body.p_method];
+      else icons[body.p_method] = body.p_url;
+      await route.fulfill({ status: 200, headers, body: 'null' });
       return;
     }
     if (url.pathname.includes('/auth/v1/')) {

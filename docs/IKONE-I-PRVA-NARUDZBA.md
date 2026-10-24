@@ -1,0 +1,11 @@
+# Učitavanje ikona i popusti za nove korisnike
+
+Nakon osnovnih migracija i nadogradnje 006, u Supabase SQL Editoru jednom pokrenite [nadogradnju 007](../public/migracije/202610240007_icons_first_order.sql). Ona stvara zaseban javni bucket `payment-icons`, dopušta upload samo administratoru i dodaje `first_order_only` kuponima. Postojeći kuponi ostaju dostupni svojoj dosadašnjoj publici. Nove Edge funkcije nisu potrebne za ove dvije promjene.
+
+U **Postavke → Uplate i pravila** uz pojedinu metodu odaberite sliku s računala. PNG, JPG i WebP do 2 MB obrađuju se lokalno u PNG do 512 × 512 piksela. Izvorna slika smije imati najviše 4096 × 4096 piksela. Ikona se odmah sprema, prikazuje pregled i može ukloniti. Poveznice se više ne upisuju u obrazac. Ranije spremljene ikone i dalje se prikazuju. Odabir ikone ne aktivira odgovarajuću platnu metodu; na javnoj stranici se Visa/Mastercard prikazuju tek uz aktivan Stripe. Uklanjanje iz postavki uklanja referencu; prethodni javni objekti ostaju u bucketu do administrativnog čišćenja.
+
+U **Popusti i kuponi → Novi popust → Kome vrijedi popust?** odaberite **Samo novi korisnici bez ijedne narudžbe**. Na kartici postojećeg kupona isto pravilo možete uključiti ili isključiti prekidačem „Samo korisnici bez prethodnih narudžbi”. Provjera vrijedi po korisničkom računu i uključuje sve prethodne narudžbe, uključujući neplaćene, otkazane i zahtjeve za ponudu. Popust je dopušten samo na prvoj narudžbi, ne na prvoj uplati. Za košaricu s više zasebnih narudžbi ovaj kod nije grupni popust: druga narudžba ne zadovoljava uvjet, pa se transakcija odbija bez djelomičnog kreiranja narudžbi.
+
+Ograničenje provodi baza i pri istodobnim zahtjevima s različitim kodovima. Odijeljeno zaključavanje po korisniku obuhvaća i obične narudžbe bez kupona. Pogrešan pokušaj ne ostavlja dodatnu narudžbu. Dosadašnje cijene i kupljene narudžbe se ne mijenjaju. Banner navodi uvjet prve narudžbe i ne prikazuje se prijavljenim kupcima koji već imaju narudžbe.
+
+Provjere: PostgreSQL testovi dozvola za Storage, RPC-a za ikone, uvjeta prve narudžbe, očuvanja običnih kupona i paralelne prve narudžbe s različitim kodovima; browser testovi stvarne pripreme PNG-a, uploada, uklanjanja ikone i spremanja pravila kupona na računalu i mobitelu. Testovi ne koriste stvarne kartice ili uplate.

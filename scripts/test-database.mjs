@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 const name = `fp-test-${randomUUID().slice(0, 8)}`;
@@ -50,7 +50,7 @@ try {
     .sort()) {
     sql(
       readFileSync(
-        file === '202610240006_admin_tools.sql'
+        ['202610240006_admin_tools.sql', '202610240007_icons_first_order.sql'].includes(file)
           ? `public/migracije/${file}`
           : `supabase/migrations/${file}`,
         'utf8',
@@ -62,7 +62,41 @@ try {
     sql(
       readFileSync('tests/database.sql', 'utf8') +
         '\n' +
-        readFileSync('tests/admin-tools.sql', 'utf8'),
+        readFileSync('tests/admin-tools.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/commerce.sql', 'utf8'),
+    ),
+  );
+  // Dva različita kupona izbjegavaju serijalizaciju samo na retku istog kupona.
+  const concurrentOrder = (code) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(
+        'docker',
+        ['exec', '-i', name, 'psql', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', '-q'],
+        { stdio: ['pipe', 'ignore', 'pipe'] },
+      );
+      let stderr = '';
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+      child.on('error', reject);
+      child.on('close', (code) => resolve({ code, stderr }));
+      child.stdin.end(
+        `set role authenticated;select set_config('request.jwt.claim.sub','77777777-7777-4777-8777-777777777777',false);begin;select public.create_order((select id from public.services where slug='excel'),1,'Istodobna prva narudžba','Opis za provjeru istodobnog korištenja kupona',null,'full','${code}');select pg_sleep(0.3);commit;`,
+      );
+    });
+  const concurrent = await Promise.all([concurrentOrder('FIRSTA'), concurrentOrder('FIRSTB')]);
+  if (
+    concurrent.filter((result) => result.code === 0).length !== 1 ||
+    concurrent.filter(
+      (result) =>
+        result.code !== 0 && result.stderr.includes('Kupon vrijedi samo za prvu narudžbu'),
+    ).length !== 1
+  )
+    throw new Error('Istodobni popusti za prvu narudžbu nisu serijalizirani.');
+  console.log(
+    sql(
+      `do $$begin if(select count(*)from public.orders where user_id='77777777-7777-4777-8777-777777777777')<>1 then raise exception 'Više od jedne prve narudžbe';end if;raise notice 'PASS: Istodobne narudžbe s različitim kuponima dopuštaju samo jednu prvu narudžbu';end$$;`,
     ),
   );
   console.log(

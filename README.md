@@ -83,3 +83,6 @@ Supabase, hosting, Stripe, e-mail, pohrana i promet imaju ograničenja i mogu st
 Vizualno usklađenje prema osam referentnih prikaza opisano je u [docs/DIZAJN.md](docs/DIZAJN.md). Zajedničke komponente administrator može pregledati na `/admin/dizajn-sustav`.
 
 Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upute za SQL nadogradnju i objavu](docs/ADMIN-NADOGRADNJA.md).
+
+- [Stripe: postavljanje testne i stvarne naplate](docs/STRIPE-POSTAVLJANJE.md)
+- [Učitavanje ikona i popusti samo za prvu narudžbu](docs/IKONE-I-PRVA-NARUDZBA.md) — jednokratna SQL nadogradnja 007 nakon 006.

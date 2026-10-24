@@ -1,3 +1,4 @@
+import { PaymentIconUpload } from '../../components/payment-icon-upload';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -49,11 +50,6 @@ export function PlatformSettings() {
     const data = new FormData(form);
     const ok = await action(async () => {
       if (kind === 'site') {
-        const icons: Record<string, string> = {};
-        for (const name of ['visa', 'mastercard', 'apple_pay', 'google_pay', 'keks', 'aircash']) {
-          const value = field(data, `icon_${name}`);
-          if (value) icons[name] = value;
-        }
         const values = parsed(siteSchema, {
           platform_name: data.has('platform_name')
             ? field(data, 'platform_name')
@@ -89,14 +85,16 @@ export function PlatformSettings() {
             tab === 'payments'
               ? data.get('policies_approved') === 'on'
               : site?.policies_approved || false,
-          payment_icons: tab === 'payments' ? icons : site?.payment_icons || {},
+          payment_icons: site?.payment_icons || {},
         });
         if (tab === 'payments') {
           values.facebook_url = site?.facebook_url || '';
           values.instagram_url = site?.instagram_url || '';
           values.linkedin_url = site?.linkedin_url || '';
         }
-        const { error } = await requireDb().from('site_settings').update(values).eq('id', true);
+        const payload: Record<string, unknown> = { ...values };
+        delete payload.payment_icons;
+        const { error } = await requireDb().from('site_settings').update(payload).eq('id', true);
         if (error) throw error;
       } else {
         const values = parsed(businessSchema, {
@@ -348,25 +346,7 @@ export function PlatformSettings() {
                       Rokovi se zaključavaju na novoj narudžbi. Ne mijenjaju ranije ugovorene uvjete
                       i ne otkazuju automatski narudžbe.
                     </p>
-                    <h3>Vlastite ikone plaćanja</h3>
-                    {[
-                      ['visa', 'Visa'],
-                      ['mastercard', 'Mastercard'],
-                      ['apple_pay', 'Apple Pay'],
-                      ['google_pay', 'Google Pay'],
-                      ['keks', 'KEKS Pay'],
-                      ['aircash', 'Aircash'],
-                    ].map(([key, label]) => (
-                      <label key={key}>
-                        {label} — URL ikone
-                        <input
-                          type="url"
-                          name={`icon_${key}`}
-                          placeholder="https://…"
-                          defaultValue={site.payment_icons?.[key] || ''}
-                        />
-                      </label>
-                    ))}
+                    <PaymentIconUpload icons={site.payment_icons || {}} />
                     <p>
                       Ikona je vizualni materijal; ne aktivira platnu integraciju. Neaktivne metode
                       ne prikazuju se kupcima kao dostupne.

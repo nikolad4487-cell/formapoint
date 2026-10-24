@@ -123,3 +123,68 @@ test('nedostajuća migracija nudi SQL datoteku umjesto praznog modula', async ({
     '/migracije/202610240006_admin_tools.sql',
   );
 });
+test('ikona kartice se učitava kao PNG i može ukloniti bez unosa poveznice', async ({ page }) => {
+  await page.goto('/admin/postavke');
+  await page.getByRole('button', { name: 'Uplate i pravila' }).click();
+  await expect(page.getByLabel('Učitaj ikonu Visa', { exact: true })).toBeVisible();
+  const sourceImage = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 4;
+    c.height = 4;
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#3155f6';
+    ctx.fillRect(0, 0, 4, 4);
+    return c.toDataURL('image/jpeg').split(',')[1];
+  });
+  const upload = page.waitForRequest(
+    (r) => r.method() === 'POST' && r.url().includes('/storage/v1/object/payment-icons/visa/'),
+  );
+  await page
+    .getByLabel('Učitaj ikonu Visa', { exact: true })
+    .setInputFiles({
+      name: 'visa.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from(sourceImage, 'base64'),
+    });
+  const uploadedRequest = await upload;
+  const multipart = await new Response(uploadedRequest.postDataBuffer(), {
+    headers: { 'Content-Type': uploadedRequest.headers()['content-type'] },
+  }).formData();
+  const image = [...multipart.values()].find((value) => typeof value !== 'string') as File;
+  expect(image.type).toBe('image/png');
+  const bytes = new Uint8Array(await image.arrayBuffer());
+  expect([...bytes.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  await expect(page.getByRole('img', { name: 'Ikona Visa', exact: true })).toBeVisible();
+  await expect(page.locator('input[name="icon_visa"]')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Ukloni ikonu Visa', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'Ikona Visa', exact: true })).toHaveCount(0);
+});
+test('novi popust sprema uvjet da kupac nema prethodnih narudžbi', async ({ page }) => {
+  await page.goto('/admin/kuponi');
+  await page.getByRole('button', { name: 'Novi popust' }).click();
+  await page.getByLabel('Naziv predloška').fill('Dobrodošlica');
+  await page.getByLabel('Kod', { exact: true }).fill('PRVI20');
+  await page.getByLabel('Vrijednost', { exact: true }).fill('20');
+  await page.getByLabel('Najviše korištenja').fill('100');
+  await page.getByLabel('Vrijedi do').fill('2027-12-31T23:59');
+  await page.getByLabel('Kome vrijedi popust?').selectOption('new');
+  const saved = page.waitForRequest(
+    (r) => r.method() === 'POST' && r.url().includes('/rest/v1/promo_codes'),
+  );
+  await page.getByRole('button', { name: 'Izradi popust' }).click();
+  expect((await saved).postDataJSON()).toMatchObject({
+    first_order_only: true,
+    customer_id: null,
+    code: 'PRVI20',
+  });
+  await expect(
+    page.getByText('Samo novi korisnici — prva narudžba', { exact: true }),
+  ).toBeVisible();
+  const changed = page.waitForRequest(
+    (r) => r.method() === 'PATCH' && r.url().includes('/rest/v1/promo_codes'),
+  );
+  await page.getByRole('checkbox', { name: 'Samo novi korisnici za kupon PRVI20' }).uncheck();
+  expect((await changed).postDataJSON()).toMatchObject({ first_order_only: false });
+  await expect(page.getByText('Za sve korisnike', { exact: true })).toBeVisible();
+});

@@ -22,6 +22,7 @@ interface Discount {
   banner: boolean;
   customer_id: string | null;
   service_id: string | null;
+  first_order_only?: boolean;
 }
 export function DiscountsAdmin() {
   const q = useRows<Discount>('promo_codes'),
@@ -31,8 +32,26 @@ export function DiscountsAdmin() {
     [deleting, setDeleting] = useState<Discount | null>(null),
     [search, setSearch] = useState(''),
     [customer, setCustomer] = useState(''),
-    [specific, setSpecific] = useState(false),
+    [audience, setAudience] = useState('all'),
     [busy, setBusy] = useState(false);
+  const [updating, setUpdating] = useState('');
+  async function changeFirstOrder(id: string, enabled: boolean) {
+    setUpdating(id);
+    void cache.cancelQueries({ queryKey: ['promo_codes'] });
+    cache.setQueriesData<Discount[]>({ queryKey: ['promo_codes'] }, (rows) =>
+      rows?.map((row) => (row.id === id ? { ...row, first_order_only: enabled } : row)),
+    );
+    await action(async () => {
+      const { error } = await requireDb()
+        .from('promo_codes')
+        .update({ first_order_only: enabled })
+        .eq('id', id);
+      if (error) throw error;
+    });
+    await cache.invalidateQueries();
+    setUpdating('');
+  }
+  const specific = audience === 'specific';
   const users = useQuery({
     queryKey: ['discount-users', search],
     enabled: specific,
@@ -54,7 +73,7 @@ export function DiscountsAdmin() {
           <Button
             onClick={() => {
               setOpen(true);
-              setSpecific(false);
+              setAudience('all');
               setCustomer('');
             }}
           >
@@ -78,12 +97,28 @@ export function DiscountsAdmin() {
                   {localDate(c.expires_at)} · najviše {c.max_uses} korištenja
                 </p>
                 <p>
-                  {c.customer_id ? 'Namijenjeno jednom korisniku' : 'Za sve korisnike'}
+                  {c.first_order_only
+                    ? 'Samo novi korisnici — prva narudžba'
+                    : c.customer_id
+                      ? 'Namijenjeno jednom korisniku'
+                      : 'Za sve korisnike'}
                   {c.service_id
                     ? ` · ${services.data?.find((s) => s.id === c.service_id)?.name || 'Odabrana usluga'}`
                     : ''}
                 </p>
                 {c.banner && <p className="badge">Glavni banner</p>}
+                {c.first_order_only !== undefined && (
+                  <label className="checkbox">
+                    <input
+                      type="checkbox"
+                      aria-label={`Samo novi korisnici za kupon ${c.code}`}
+                      checked={c.first_order_only}
+                      disabled={Boolean(updating)}
+                      onChange={(e) => void changeFirstOrder(c.id, e.target.checked)}
+                    />
+                    Samo korisnici bez prethodnih narudžbi
+                  </label>
+                )}
                 <div className="actions">
                   <Button
                     variant="outline"
@@ -156,6 +191,7 @@ export function DiscountsAdmin() {
                   max_uses: Number(field(f, 'max')),
                   expires_at: new Date(field(f, 'expires')).toISOString(),
                   customer_id: specific ? customer : null,
+                  ...(audience === 'new' ? { first_order_only: true } : {}),
                   service_id: field(f, 'service') || null,
                 });
               if (error) throw error;
@@ -207,14 +243,20 @@ export function DiscountsAdmin() {
               ))}
             </select>
           </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={specific}
-              onChange={(e) => setSpecific(e.target.checked)}
-            />
-            Za određenog korisnika
+          <label>
+            Kome vrijedi popust?
+            <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+              <option value="all">Svi korisnici</option>
+              <option value="new">Samo novi korisnici bez ijedne narudžbe</option>
+              <option value="specific">Određeni korisnik</option>
+            </select>
           </label>
+          {audience === 'new' && (
+            <p>
+              Vrijedi samo za prvu narudžbu računa. Ranije narudžbe, uključujući otkazane i zahtjeve
+              za ponudu, isključuju ovaj popust.
+            </p>
+          )}
           {specific && (
             <>
               <label>

@@ -3366,3 +3366,51 @@ body {
     grid-column: auto;
   }
 }
+.payment-icon-editor {
+  margin: 20px 0;
+}
+.payment-icon-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #e7ebf5;
+}
+.payment-icon-preview {
+  width: 76px;
+  height: 48px;
+  border: 1px solid #e2e7f1;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #64718e;
+}
+.payment-icon-preview img {
+  max-width: 66px;
+  max-height: 36px;
+  object-fit: contain;
+}
+.icon-file-label {
+  margin: 0 !important;
+  min-width: 0;
+  flex: 1;
+}
+.icon-file-label > span {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #3155f6;
+  font-size: 12px;
+  margin: 6px 0;
+}
+.icon-file-label input {
+  font-size: 12px;
+  max-width: 100%;
+  padding: 7px !important;
+}
+.payment-icon-row > .button {
+  padding: 7px;
+}

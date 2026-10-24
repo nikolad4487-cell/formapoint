@@ -10,7 +10,13 @@ export function DiscountBanner() {
     queryFn: async () => {
       const { data, error } = await requireDb().rpc('discount_banner');
       if (error) return null;
-      return data as { name: string; code: string; kind: string; value: number } | null;
+      return data as {
+        name: string;
+        code: string;
+        kind: string;
+        value: number;
+        first_order_only?: boolean;
+      } | null;
     },
   });
   if (!q.data) return null;
@@ -19,6 +25,7 @@ export function DiscountBanner() {
     <div className="discount-banner">
       <span>
         {offer.name} · {offer.kind === 'percent' ? `${offer.value} %` : money(offer.value)} popusta
+        {offer.first_order_only ? ' za prvu narudžbu' : ''}
       </span>
       <button
         onClick={() =>
