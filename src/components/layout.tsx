@@ -1,3 +1,6 @@
+import { HelpPanel } from './help-panel';
+import { useSiteSettings } from '../hooks/use-site-settings';
+import { DiscountBanner } from './discount-banner';
 import { SupportCard } from './brand';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -35,47 +38,51 @@ import { toast } from 'sonner';
 export function PublicHeader() {
   const [open, setOpen] = useState(false);
   return (
-    <header className="public-header">
-      <div className="container header-inner">
-        <Logo />
-        <nav className={open ? 'public-nav open' : 'public-nav'} aria-label="Glavna navigacija">
-          {[
-            ['/', 'Početna'],
-            ['/usluge', 'Usluge'],
-            ['/kako-funkcionira', 'Kako funkcionira'],
-            ['/cjenik', 'Cjenik'],
-            ['/kontakt', 'Kontakt'],
-          ].map(([to, label]) => (
-            <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)}>
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-        <div className="header-actions">
-          <Link className="login-link" to="/prijava">
-            Prijava <ArrowUpRight size={15} />
-          </Link>
-          <Button asChild size="sm">
-            <Link to="/registracija">
-              Registracija <ArrowRight size={15} />
+    <>
+      <DiscountBanner />
+      <header className="public-header">
+        <div className="container header-inner">
+          <Logo />
+          <nav className={open ? 'public-nav open' : 'public-nav'} aria-label="Glavna navigacija">
+            {[
+              ['/', 'Početna'],
+              ['/usluge', 'Usluge'],
+              ['/kako-funkcionira', 'Kako funkcionira'],
+              ['/cjenik', 'Cjenik'],
+              ['/kontakt', 'Kontakt'],
+            ].map(([to, label]) => (
+              <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)}>
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="header-actions">
+            <Link className="login-link" to="/prijava">
+              Prijava <ArrowUpRight size={15} />
             </Link>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mobile-menu"
-            aria-label={open ? 'Zatvori izbornik' : 'Otvori izbornik'}
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-          >
-            {open ? <X /> : <Menu />}
-          </Button>
+            <Button asChild size="sm">
+              <Link to="/registracija">
+                Registracija <ArrowRight size={15} />
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="mobile-menu"
+              aria-label={open ? 'Zatvori izbornik' : 'Otvori izbornik'}
+              aria-expanded={open}
+              onClick={() => setOpen(!open)}
+            >
+              {open ? <X /> : <Menu />}
+            </Button>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
 export function PublicFooter() {
+  const { data: site } = useSiteSettings();
   return (
     <footer className="public-footer">
       <div className="container footer-grid">
@@ -94,6 +101,7 @@ export function PublicFooter() {
           <Link to="/kako-funkcionira">Kako funkcionira</Link>
           <Link to="/cjenik">Cjenik</Link>
           <Link to="/faq">Česta pitanja</Link>
+          <Link to="/portfolio">Portfolio radova</Link>
         </div>
         <div>
           <h4>FormaPoint</h4>
@@ -101,6 +109,25 @@ export function PublicFooter() {
           <Link to="/kontakt">Kontakt</Link>
           <Link to="/app/podrska">Podrška</Link>
           <Link to="/prigovori">Prigovori</Link>
+          {site?.public_contact_email && (
+            <a href={`mailto:${site.public_contact_email}`}>{site.public_contact_email}</a>
+          )}
+          {site?.contact_phone && (
+            <a href={`tel:${site.contact_phone.replace(/[^+0-9]/g, '')}`}>{site.contact_phone}</a>
+          )}
+          {(
+            [
+              ['Facebook', site?.facebook_url],
+              ['Instagram', site?.instagram_url],
+              ['LinkedIn', site?.linkedin_url],
+            ] as const
+          )
+            .filter(([, url]) => url)
+            .map(([label, url]) => (
+              <a key={label} href={url!} target="_blank" rel="noopener noreferrer">
+                {label}
+              </a>
+            ))}
         </div>
         <div>
           <h4>Pravne informacije</h4>
@@ -136,6 +163,7 @@ export function AppShell() {
         <Outlet />
       </main>
       <PublicFooter />
+      <HelpPanel />
     </div>
   );
 }
@@ -191,7 +219,12 @@ const adminLinks = [
   ['/poruke', 'Poruke', MessageSquare],
   ['/datoteke', 'Datoteke', Files],
   ['/podrska', 'Podrška', LifeBuoy],
-  ['/kuponi', 'Kuponi', Tags],
+  ['/kuponi', 'Popusti i kuponi', Tags],
+  ['/upiti', 'Kontaktni upiti', MessageSquare],
+  ['/stranice', 'Stranice', BookOpen],
+  ['/portfolio', 'Radovi i portfolio', Files],
+  ['/newsletter', 'Newsletter', Bell],
+  ['/vizualni-identitet', 'Vizualni identitet', Layers],
   ['/izvjestaji', 'Izvještaji', Activity],
   ['/obavijesti', 'Obavijesti', Bell],
   ['/audit-log', 'Audit log', Shield],

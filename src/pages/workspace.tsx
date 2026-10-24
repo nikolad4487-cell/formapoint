@@ -1,3 +1,4 @@
+import { AdminDashboardExtras } from './admin/overview';
 import {
   OrderStageTimeline,
   OrderSummaryTable,
@@ -158,6 +159,7 @@ export function DashboardPage({ admin = false }: { admin?: boolean }) {
             tone="violet"
           />
         </div>
+        {admin && <AdminDashboardExtras />}
         <div className="overview-grid">
           <section className="panel">
             <div className="panel-heading">
@@ -715,6 +717,14 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
             <h2>Upute za izradu</h2>
             <p style={{ whiteSpace: 'pre-wrap' }}>{order.description}</p>
             {order.due_at && <p>Željeni / dogovoreni rok: {localDate(order.due_at)}</p>}
+            {order.cancellation_deadline_at && (
+              <p>
+                Ugovoreni rok za zahtjev za otkazivanje: {localDate(order.cancellation_deadline_at)}
+              </p>
+            )}
+            {order.final_payment_due_at && (
+              <p>Ugovoreni rok završne uplate: {localDate(order.final_payment_due_at)}</p>
+            )}
             {!admin && ['deposit_pending', 'final_pending'].includes(order.status) && (
               <PaymentAction busy={busy} pay={() => void pay()} />
             )}
@@ -1722,7 +1732,7 @@ export function NotificationsPage() {
     </>
   );
 }
-export function ProfilePage() {
+export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
   const { session } = useAuth();
   const q = useRows<{
     id: string;
@@ -1734,7 +1744,7 @@ export function ProfilePage() {
   const cache = useQueryClient();
   return (
     <>
-      <PageHeader title="Moj profil" />
+      <PageHeader title="Moj profil" embedded={embedded} />
       <QueryState query={q}>
         {q.data?.[0] && (
           <form
@@ -1799,7 +1809,7 @@ export function ProfilePage() {
     </>
   );
 }
-export function SettingsPage() {
+export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   const { session } = useAuth();
   const q = useRows<{ user_id: string; email_enabled: boolean }>('notification_preferences', {
     user_id: session!.user.id,
@@ -1807,7 +1817,11 @@ export function SettingsPage() {
   const cache = useQueryClient();
   return (
     <>
-      <PageHeader title="Postavke" description="Upravljajte e-mail obavijestima." />
+      <PageHeader
+        title="Postavke"
+        description="Upravljajte e-mail obavijestima."
+        embedded={embedded}
+      />
       <QueryState query={q}>
         <div className="panel">
           <label className="checkbox">
@@ -2104,7 +2118,15 @@ export function MessagesPage({ admin = false }: { admin?: boolean }) {
     </>
   );
 }
-export function ServiceEditor({ service, done }: { service?: Service; done: () => void }) {
+export function ServiceEditor({
+  service,
+  done,
+  initialCategory,
+}: {
+  service?: Service;
+  done: () => void;
+  initialCategory?: string;
+}) {
   const cache = useQueryClient();
   const [busy, setBusy] = useState(false);
   return (
@@ -2150,7 +2172,11 @@ export function ServiceEditor({ service, done }: { service?: Service; done: () =
       </label>
       <label>
         Kategorija
-        <input name="category" required defaultValue={service?.category || 'Ostalo'} />
+        <input
+          name="category"
+          required
+          defaultValue={service?.category || initialCategory || 'Ostalo'}
+        />
       </label>
       <label>
         Ikona

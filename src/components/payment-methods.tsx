@@ -1,3 +1,4 @@
+import { useSiteSettings } from '../hooks/use-site-settings';
 import { useQuery } from '@tanstack/react-query';
 import { CreditCard, Gift, LockKeyhole, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -18,6 +19,7 @@ export function usePaymentAvailability() {
 }
 export function PaymentMethods({ compact = false }: { compact?: boolean }) {
   const q = usePaymentAvailability();
+  const site = useSiteSettings().data;
   const active = configured && q.data === true;
   return (
     <section
@@ -53,7 +55,25 @@ export function PaymentMethods({ compact = false }: { compact?: boolean }) {
             </button>
           )}
         </div>
-        {active && <span className="badge status-succeeded">Aktivno</span>}
+        {active && (
+          <>
+            <span className="badge status-succeeded">Aktivno</span>
+            <div className="custom-payment-icons">
+              {['visa', 'mastercard'].map(
+                (k) =>
+                  site?.payment_icons?.[k] && (
+                    <img
+                      key={k}
+                      src={site.payment_icons[k]}
+                      alt={k === 'visa' ? 'Visa' : 'Mastercard'}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                  ),
+              )}
+            </div>
+          </>
+        )}
       </div>
       <Link className="payment-method-tile split-method" to="/kako-funkcionira">
         <span className="method-symbol">

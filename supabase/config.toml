@@ -18,3 +18,7 @@ verify_jwt = false
 verify_jwt = false
 [functions.upload]
 verify_jwt = false
+[functions.admin-tools]
+verify_jwt = false
+[functions.portfolio-download]
+verify_jwt = false

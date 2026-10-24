@@ -12,7 +12,7 @@ const AuthContext = createContext<{
 }>({ session: null, role: 'CUSTOMER', loading: true, error: null });
 export function AuthProvider({ children }: { children: ReactNode }) {
   const cache = useQueryClient();
-  const currentUser = useRef<string | undefined>(undefined);
+  const currentUser = useRef<string | null | undefined>(undefined);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<Role>('CUSTOMER');
   const [loading, setLoading] = useState(Boolean(db));
@@ -23,10 +23,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let revision = 0;
     async function apply(next: Session | null) {
       const current = ++revision;
-      if (currentUser.current !== next?.user.id) {
-        cache.clear();
+      if (currentUser.current !== (next?.user.id ?? null)) {
+        // Initial public queries already use the current session. On account changes,
+        // reset active observers so they refetch instead of leaving them detached.
+        if (currentUser.current !== undefined) void cache.resetQueries();
         if (currentUser.current) sessionStorage.removeItem(`fp-draft:${currentUser.current}`);
-        currentUser.current = next?.user.id;
+        currentUser.current = next?.user.id ?? null;
       }
       setSession(next);
       setRole('CUSTOMER');

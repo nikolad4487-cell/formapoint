@@ -3118,3 +3118,251 @@ body {
 .auth-benefits .tone-violet svg {
   color: #7430d7;
 }
+
+/* Administratorski alati i objavljeni sadržaji */
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.settings-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e2e6f3;
+  background: #fff;
+  border-radius: 10px;
+  padding: 11px 15px;
+  color: #536080;
+  font: inherit;
+  cursor: pointer;
+}
+.settings-tabs button.active {
+  color: #3155f6;
+  background: #eef1ff;
+  border-color: #bfcaff;
+}
+.settings-columns,
+.identity-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.admin-template-grid,
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 20px;
+}
+.template-card {
+  padding: 22px;
+  border: 1px solid #e3e7f2;
+  border-radius: 16px;
+}
+.template-card h3 {
+  margin: 14px 0 8px;
+}
+.admin-extra-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin: 24px 0;
+}
+.brand-shortcut {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: #263a99;
+  background: linear-gradient(135deg, #eef3ff, #f3edff);
+}
+.brand-shortcut svg {
+  width: 32px;
+  height: 32px;
+}
+.brand-shortcut span {
+  font-size: 13px;
+}
+.portfolio-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.portfolio-card h2,
+.portfolio-card p {
+  margin: 0;
+}
+.portfolio-card p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.portfolio-card > .actions:last-child {
+  margin-top: auto;
+}
+.actions {
+  flex-wrap: wrap;
+}
+.catalog-category {
+  margin: 20px 0;
+}
+.catalog-service-name {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.catalog-service-name .service-icon {
+  width: 36px;
+  height: 36px;
+}
+.large-textarea {
+  min-height: 240px;
+}
+.code-editor {
+  font-family: monospace;
+  font-size: 13px;
+}
+.newsletter-preview {
+  width: 100%;
+  height: 340px;
+  border: 1px solid #dce2f0;
+  border-radius: 12px;
+  background: #fff;
+  margin: 12px 0;
+}
+.identity-card img {
+  width: 100%;
+  height: 240px;
+  object-fit: contain;
+  margin: 15px 0;
+  background: #f6f8fd;
+  border-radius: 12px;
+}
+.prose-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.9;
+}
+.discount-banner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  background: #263cc8;
+  color: #fff;
+  font-size: 13px;
+}
+.discount-banner button {
+  color: #fff;
+  border: 1px solid #ffffff60;
+  background: #ffffff15;
+  border-radius: 7px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.coupon-code {
+  display: inline-block;
+  padding: 8px 14px;
+  border: 1px dashed #9daeff;
+  border-radius: 8px;
+  letter-spacing: 0.1em;
+}
+.custom-payment-icons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.custom-payment-icons img {
+  width: 38px;
+  height: 25px;
+  object-fit: contain;
+}
+.pagination {
+  justify-content: flex-end;
+  margin-top: 20px;
+  align-items: center;
+}
+.data-table td {
+  overflow-wrap: anywhere;
+}
+.settings-columns .panel {
+  min-width: 0;
+}
+.panel form,
+.panel input,
+.panel textarea,
+.panel select {
+  max-width: 100%;
+}
+@media (max-width: 1100px) {
+  .admin-extra-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .settings-columns,
+  .identity-grid,
+  .admin-extra-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-tabs {
+    gap: 6px;
+  }
+  .settings-tabs button {
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+  .panel-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .identity-card img {
+    height: 190px;
+  }
+}
+.help-toggle {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 35;
+  border: 0;
+  border-radius: 40px;
+  background: #3155f6;
+  color: #fff;
+  box-shadow: 0 7px 25px #3155f640;
+  padding: 13px 17px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.help-links {
+  display: grid;
+  gap: 12px;
+}
+.help-links a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid #e2e7f3;
+  border-radius: 12px;
+  color: #3155f6;
+}
+.help-toggle:focus-visible {
+  outline: 3px solid #7d94ff;
+  outline-offset: 4px;
+}
+
+.admin-extra-stats .brand-shortcut {
+  grid-column: span 2;
+}
+@media (max-width: 650px) {
+  .admin-extra-stats .brand-shortcut {
+    grid-column: auto;
+  }
+}

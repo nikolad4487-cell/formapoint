@@ -48,10 +48,23 @@ try {
   for (const file of readdirSync('supabase/migrations')
     .filter((x) => x.endsWith('.sql'))
     .sort()) {
-    sql(readFileSync(`supabase/migrations/${file}`, 'utf8'));
+    sql(
+      readFileSync(
+        file === '202610240006_admin_tools.sql'
+          ? `public/migracije/${file}`
+          : `supabase/migrations/${file}`,
+        'utf8',
+      ),
+    );
     console.log(`Migracija: ${file}`);
   }
-  console.log(sql(readFileSync('tests/database.sql', 'utf8')));
+  console.log(
+    sql(
+      readFileSync('tests/database.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/admin-tools.sql', 'utf8'),
+    ),
+  );
   console.log(
     'PostgreSQL integracijske provjere su prošle. Auth i Storage sheme su minimalni testni adapteri, ne puni Supabase.',
   );

@@ -28,6 +28,7 @@ test('FAQ se može otvoriti tipkovnicom', async ({ page }) => {
   await expect(page.getByText('Odaberite uslugu, opišite zadatak', { exact: false })).toBeVisible();
 });
 test('sve javne stranice imaju naslov i ne prelijevaju zaslon', async ({ page }) => {
+  test.setTimeout(60000);
   for (const path of [
     '/',
     '/usluge',
@@ -47,6 +48,8 @@ test('sve javne stranice imaju naslov i ne prelijevaju zaslon', async ({ page })
     '/kolacici',
     '/otkazivanje-i-povrati',
     '/prigovori',
+    '/portfolio',
+    '/odjava-newslettera',
     '/nepostojeca',
   ]) {
     await page.goto(path);

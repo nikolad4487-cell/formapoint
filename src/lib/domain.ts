@@ -57,6 +57,8 @@ export interface Order {
   paid_cents: number;
   payment_model: 'full' | 'split';
   due_at: string | null;
+  cancellation_deadline_at?: string | null;
+  final_payment_due_at?: string | null;
   created_at: string;
 }
 export interface CartItem {

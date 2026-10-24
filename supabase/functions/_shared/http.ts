@@ -6,7 +6,7 @@ export function env(name: string) {
 }
 export function admin() {
   return createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
-    auth: { persistSession: false },
+    auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 export function headers(req: Request) {

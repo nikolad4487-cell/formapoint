@@ -81,3 +81,5 @@ Prije objave vlasnik mora unijeti stvarne poslovne podatke, cijene i pravila, od
 Supabase, hosting, Stripe, e-mail, pohrana i promet imaju ograničenja i mogu stvarati troškove. Ne pretpostavlja se neograničen besplatan plan. Postavite upozorenja na potrošnju, limite veličine datoteka i politiku zadržavanja prije aktivacije.
 
 Vizualno usklađenje prema osam referentnih prikaza opisano je u [docs/DIZAJN.md](docs/DIZAJN.md). Zajedničke komponente administrator može pregledati na `/admin/dizajn-sustav`.
+
+Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upute za SQL nadogradnju i objavu](docs/ADMIN-NADOGRADNJA.md).

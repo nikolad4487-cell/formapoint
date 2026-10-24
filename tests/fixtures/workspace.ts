@@ -79,6 +79,63 @@ export async function workspaceFixture(
           services: fixtureServices[0],
         },
       ];
+  const adminTables: Record<string, Record<string, unknown>[]> = {
+    site_settings: [
+      {
+        id: true,
+        platform_name: 'FormaPoint',
+        stripe_enabled: false,
+        maintenance: true,
+        contact_phone: '+385 1 000 000',
+        public_contact_email: 'kontakt@example.invalid',
+        facebook_url: '',
+        instagram_url: '',
+        linkedin_url: '',
+        payment_icons: {},
+        cancellation_days: null,
+        final_payment_days: null,
+        policies_approved: false,
+        created_at: '2026-10-01T10:00:00Z',
+      },
+    ],
+    business_settings: [
+      {
+        id: true,
+        legal_name: 'Testni obrt',
+        address: '',
+        contact_email: '',
+        tax_status: '',
+        notification_email: null,
+        payment_recipient: null,
+        iban: null,
+        bank_name: null,
+        payment_phone: null,
+        created_at: '2026-10-01T10:00:00Z',
+      },
+    ],
+    profiles: [
+      {
+        id: fixtureUser,
+        first_name: 'Test',
+        last_name: 'Korisnik',
+        phone: '',
+        marketing_consent: false,
+      },
+    ],
+    notification_preferences: [{ user_id: fixtureUser, email_enabled: true }],
+    service_categories: [...new Set(fixtureServices.map((s) => s.category))].map((name, i) => ({
+      id: String(i),
+      name,
+      created_at: '2026-10-01T10:00:00Z',
+    })),
+    content_pages: [],
+    portfolio_items: [],
+    newsletter_templates: [],
+    newsletter_subscribers: [],
+    newsletter_campaigns: [],
+    newsletter_deliveries: [],
+    promo_codes: [],
+  };
   await page.route('http://127.0.0.1:54321/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -112,6 +169,78 @@ export async function workspaceFixture(
         status: 500,
         headers,
         body: JSON.stringify({ message: 'Testna pogreška API-ja' }),
+      });
+      return;
+    }
+    if (table === 'admin-tools') {
+      await route.fulfill({
+        status: 200,
+        headers,
+        body: JSON.stringify({ email_configured: false, invites_available: false }),
+      });
+      return;
+    }
+    if (table === 'admin_summary') {
+      await route.fulfill({
+        status: 200,
+        headers,
+        body: JSON.stringify({
+          users: 12,
+          messages_month: 8,
+          inquiries_week: 3,
+          revenue_month: 1251,
+        }),
+      });
+      return;
+    }
+    if (table === 'discount_banner') {
+      await route.fulfill({ status: 200, headers, body: 'null' });
+      return;
+    }
+    if (table === 'admin_users') {
+      await route.fulfill({
+        status: 200,
+        headers,
+        body: JSON.stringify([
+          {
+            id: fixtureUser,
+            first_name: 'Test',
+            last_name: 'Korisnik',
+            email: user.email,
+            roles: ['ADMIN'],
+            order_count: 2,
+            created_at: user.created_at,
+          },
+        ]),
+      });
+      return;
+    }
+    if (table in adminTables) {
+      const rows = adminTables[table];
+      const matches = (row: Record<string, unknown>) =>
+        [...url.searchParams.entries()].every(
+          ([key, value]) => !value.startsWith('eq.') || String(row[key]) === value.slice(3),
+        );
+      if (request.method() === 'POST') {
+        const value = request.postDataJSON();
+        rows.unshift({
+          id: crypto.randomUUID(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          scan_status: 'linked',
+          ...value,
+        });
+      }
+      if (request.method() === 'PATCH')
+        for (const row of rows.filter(matches)) Object.assign(row, request.postDataJSON());
+      if (request.method() === 'DELETE') adminTables[table] = rows.filter((row) => !matches(row));
+      const result = adminTables[table].filter(matches);
+      await route.fulfill({
+        status: 200,
+        headers,
+        body: JSON.stringify(
+          request.headers()['accept']?.includes('vnd.pgrst.object') ? result[0] || null : result,
+        ),
       });
       return;
     }

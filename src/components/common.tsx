@@ -1,3 +1,4 @@
+import { useSiteSettings } from '../hooks/use-site-settings';
 import { BrandMark } from './brand-mark';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -26,10 +27,17 @@ export function ServiceIcon({ name }: { name: string }) {
   return <Icon size={25} strokeWidth={1.7} />;
 }
 export function Logo() {
+  const name = useSiteSettings().data?.platform_name || 'FormaPoint';
   return (
-    <Link to="/" className="logo" aria-label="FormaPoint početna">
+    <Link to="/" className="logo" aria-label={`${name} početna`}>
       <BrandMark />
-      Forma<span>Point</span>
+      {name === 'FormaPoint' ? (
+        <>
+          Forma<span>Point</span>
+        </>
+      ) : (
+        name
+      )}
     </Link>
   );
 }
@@ -38,17 +46,19 @@ export function PageHeader({
   title,
   description,
   actions,
+  embedded = false,
 }: {
   eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
+  embedded?: boolean;
 }) {
   return (
     <div className="page-header">
       <div>
         {eyebrow && <span className="eyebrow">{eyebrow}</span>}
-        <h1>{title}</h1>
+        {embedded ? <h2>{title}</h2> : <h1>{title}</h1>}
         {description && <p>{description}</p>}
       </div>
       {actions}
@@ -66,6 +76,20 @@ export function StatusBadge({ status }: { status: string }) {
           failed: 'Neuspjelo',
           open: 'Otvoreno',
           closed: 'Zatvoreno',
+          published: 'Objavljeno',
+          draft: 'Nacrt',
+          active: 'Aktivno',
+          inactive: 'Neaktivno',
+          linked: 'Vanjska poveznica',
+          subscribed: 'Pretplaćen',
+          unsubscribed: 'Odjavljen',
+          queued: 'U redu za slanje',
+          sending: 'Slanje',
+          sent: 'Obrađeno',
+          skipped: 'Preskočeno',
+          rejected: 'Odbijeno',
+          processing: 'Obrada',
+          cancelled: 'Otkazano',
           clean: 'Provjereno',
           quarantined: 'Čeka sigurnosnu provjeru',
         }[status] ||

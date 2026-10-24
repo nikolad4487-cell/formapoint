@@ -1,3 +1,5 @@
+import { usePublishedPage } from '../hooks/use-site-settings';
+import { PublishedText } from './content';
 import { WorkspaceIllustration, BrandBenefit } from '../components/brand';
 import { PaymentMethods } from '../components/payment-methods';
 import { useState } from 'react';
@@ -455,6 +457,8 @@ const legal: Record<string, [string, string[]]> = {
   ],
 };
 export function InfoPage({ kind }: { kind: string }) {
+  const published = usePublishedPage(kind);
+  if (published.data) return <PublishedText page={published.data} />;
   if (kind === 'faq')
     return (
       <div className="container narrow section">

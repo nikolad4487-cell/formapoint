@@ -1,3 +1,12 @@
+import { ContactInquiries } from './pages/admin/inquiries';
+import { PlatformSettings } from './pages/admin/settings';
+import { CatalogAdmin } from './pages/admin/catalog';
+import { ContentPages, PortfolioAdmin } from './pages/admin/content';
+import { NewsletterAdmin } from './pages/admin/newsletter';
+import { AdminUsers } from './pages/admin/users';
+import { VisualIdentity } from './pages/admin/identity';
+import { DiscountsAdmin } from './pages/admin/discounts';
+import { ContentPageView, PublicPortfolio, NewsletterUnsubscribe } from './pages/content';
 import { DesignSystemPage } from './pages/design-system';
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -24,15 +33,11 @@ import {
   ContactPage,
 } from './pages/workspace';
 import {
-  AdminServices,
   AdminServiceRoute,
   CategoriesPage,
   QuotesPage,
-  UsersPage,
-  CouponsPage,
   AuditPage,
   ReportsPage,
-  AdminSettings,
   AdminSupport,
 } from './pages/admin';
 import './index.css';
@@ -99,6 +104,9 @@ function App() {
           ].map((kind) => (
             <Route key={kind} path={kind} element={<InfoPage kind={kind} />} />
           ))}
+          <Route path="portfolio" element={<PublicPortfolio />} />
+          <Route path="p/:slug" element={<ContentPageView />} />
+          <Route path="odjava-newslettera" element={<NewsletterUnsubscribe />} />
           <Route path="kontakt" element={<ContactPage />} />
           <Route path="prijava" element={<AuthPage />} />
           <Route path="registracija" element={<AuthPage mode="register" />} />
@@ -132,18 +140,23 @@ function App() {
             <Route index element={<DashboardPage admin />} />
             <Route path="narudzbe" element={<OrdersPage admin />} />
             <Route path="narudzbe/:id" element={<OrderDetailPage admin />} />
-            <Route path="usluge" element={<AdminServices />} />
+            <Route path="usluge" element={<CatalogAdmin />} />
             <Route path="usluge/nova" element={<AdminServiceRoute />} />
             <Route path="usluge/:id" element={<AdminServiceRoute />} />
+            <Route path="stranice" element={<ContentPages />} />
+            <Route path="portfolio" element={<PortfolioAdmin />} />
+            <Route path="newsletter" element={<NewsletterAdmin />} />
+            <Route path="vizualni-identitet" element={<VisualIdentity />} />
+            <Route path="upiti" element={<ContactInquiries />} />
             <Route path="kategorije" element={<CategoriesPage />} />
             <Route path="ponude" element={<QuotesPage />} />
             <Route path="placanja" element={<PaymentsPage admin />} />
-            <Route path="korisnici" element={<UsersPage />} />
-            <Route path="korisnici/:id" element={<UsersPage />} />
-            <Route path="kuponi" element={<CouponsPage />} />
+            <Route path="korisnici" element={<AdminUsers />} />
+            <Route path="korisnici/:id" element={<AdminUsers />} />
+            <Route path="kuponi" element={<DiscountsAdmin />} />
             <Route path="audit-log" element={<AuditPage />} />
             <Route path="izvjestaji" element={<ReportsPage />} />
-            <Route path="postavke" element={<AdminSettings />} />
+            <Route path="postavke" element={<PlatformSettings />} />
             <Route path="dizajn-sustav" element={<DesignSystemPage />} />
             <Route path="poruke" element={<MessagesPage admin />} />
             <Route path="poruke/:id" element={<MessagesPage admin />} />
