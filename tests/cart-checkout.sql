@@ -1,0 +1,62 @@
+reset role;
+insert into auth.users(id)values('88888888-8888-4888-8888-888888888888'),('99999999-9999-4999-8999-999999999999');
+update public.site_settings set stripe_enabled=true,maintenance=false,bank_enabled=true;
+update public.business_settings set iban='HR1210010051863000160',payment_recipient='Testni primatelj',bank_name='Test banka';
+insert into public.service_categories(name,slug)values('Checkout test','checkout-test');
+insert into public.services(name,slug,description,category,price_cents,split_enabled,split_min_cents)values('Prvi artikl','checkout-prvi','Testni opis','Checkout test',1001,true,200)returning id as cart_first \gset
+insert into public.services(name,slug,description,category,price_cents,split_enabled,split_min_cents)values('Drugi artikl','checkout-drugi','Testni opis','Checkout test',999,true,200)returning id as cart_second \gset
+insert into public.promo_codes(code,kind,value,max_uses,expires_at,first_order_only)values('CARTFIRST','percent',10,10,now()+interval'1 day',true);
+insert into public.promo_codes(code,kind,value,max_uses,expires_at,service_id)values('CARTSECOND','percent',10,10,now()+interval'1 day',:'cart_second');
+set role authenticated;select set_config('request.jwt.claim.sub','88888888-8888-4888-8888-888888888888',false);
+select public.cart_add(:'cart_first',1);select public.cart_add(:'cart_first',1);select public.cart_add(:'cart_second',1);
+select pg_temp.assert_true((select count(*)=2 and sum(quantity)=3 from public.cart_items),'Ponovljeno dodavanje povećava količinu, bez stvaranja narudžbe');
+select pg_temp.assert_true(not exists(select 1 from public.orders where user_id=auth.uid()),'Dodavanje u košaricu ne stvara narudžbu');
+select pg_temp.assert_true((public.cart_pricing('CARTFIRST')->>'total')::int=2701,'Prvi kupon izračunava se jednom na cijelu košaricu');
+select pg_temp.assert_true((public.cart_pricing('CARTSECOND')->>'discount')::int=99,'Kupon za artikl popušta samo stavke tog artikla');
+select pg_temp.expect_error(format('select public.checkout_cart_order(gen_random_uuid(),''Košarica'',''Detaljne upute zadatka'',now()+interval''2 day'',''google_pay'',''full'',''{"course":"Dokumenti"}'',null)'),'Neuključeni Google Pay odbija se na poslužitelju');
+select pg_temp.expect_error('select public.checkout_cart_order(gen_random_uuid(),''Košarica'',''Detaljne upute zadatka'',now()-interval''2 day'',''bank'',''full'',''{"course":"Dokumenti"}'',null)','Prošli rok zaustavlja narudžbu');
+select pg_temp.expect_error('select public.checkout_cart_order(gen_random_uuid(),''Košarica'',''Detaljne upute zadatka'',now()+interval''2 day'',''bank'',''full'',''{}'',null)','Nedostajući podaci zaustavljaju narudžbu');
+select public.checkout_cart_order('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1','Košarica sa dva artikla','Detaljne upute za oba artikla',now()+interval'2 day','bank','split','{"course":"Dokumenti","student":"Test ime","secret":"ignored"}','CARTFIRST')as basket_order \gset
+select pg_temp.assert_true((select count(*)=1 from public.orders where user_id=auth.uid()),'Više artikala stvara jednu narudžbu');
+select pg_temp.assert_true((select count(*)=2 and sum(unit_cents*quantity)=3001 from public.order_items where order_id=:'basket_order'),'Narudžba čuva sve artikle, količine i izvorne cijene');
+select pg_temp.assert_true((select total_cents=2701 and paid_cents=0 and payment_method='bank'and status='deposit_pending'and checkout_details->>'student'='Test ime'and not(checkout_details?'secret')and bank_instructions->>'iban'='HR1210010051863000160' from public.orders where id=:'basket_order'),'Narudžba čuva server cijenu, podatke i IBAN bez potvrđivanja uplate');
+select pg_temp.assert_true((select amount_cents=1351 from public.payment_installments where order_id=:'basket_order'and installment=1)and(select amount_cents=1350 from public.payment_installments where order_id=:'basket_order'and installment=2),'50/50 točno dijeli i neparni iznos u centima');
+select pg_temp.assert_true(not exists(select 1 from public.cart_items),'Potvrđena košarica se prazni');
+select pg_temp.assert_true(public.checkout_cart_order('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1','Košarica sa dva artikla','Detaljne upute za oba artikla',now()+interval'2 day','bank','split','{"course":"Dokumenti"}','CARTFIRST')=:'basket_order','Ponovljena potvrda vraća istu narudžbu');
+select pg_temp.expect_error(format('select public.confirm_bank_payment(%L,1351,''BANK-TEST-001'')',:'basket_order'),'Kupac ne potvrđuje IBAN uplatu');
+select public.cart_add(:'cart_first',1);
+select pg_temp.expect_error('select public.cart_pricing(''CARTFIRST'')','Popust za nove korisnike ne prolazi nakon prve košarice');
+select public.cart_clear();
+reset role;
+select pg_temp.expect_error(format('select public.reserve_payment(%L,''88888888-8888-4888-8888-888888888888'')',:'basket_order'),'Stripe ne rezervira naplatu za IBAN narudžbu');
+update public.business_settings set iban='DE89370400440532013000';
+select pg_temp.assert_true((select bank_instructions->>'iban'='HR1210010051863000160'from public.orders where id=:'basket_order'),'Promjena postavki ne mijenja IBAN već kreirane narudžbe');
+set role authenticated;select set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',false);
+select pg_temp.expect_error(format('select public.confirm_bank_payment(%L,2701,''BANK-TEST-001'')',:'basket_order'),'Admin ne može potvrditi iznos različit od trenutačne rate');
+select public.confirm_bank_payment(:'basket_order',1351,'BANK-TEST-001')as bank_first \gset
+select pg_temp.assert_true(public.confirm_bank_payment(:'basket_order',1351,'BANK-TEST-001')=:'bank_first','Ponovljena potvrda iste bankovne transakcije je idempotentna');
+select pg_temp.assert_true((select paid_cents=1351 and status='ready'from public.orders where id=:'basket_order'),'Prva IBAN uplata otključava izradu');
+select pg_temp.expect_error(format('select public.confirm_bank_payment(%L,1350,''BANK-TEST-002'')',:'basket_order'),'Druga rata se ne potvrđuje prije dovršene izrade');
+select public.transition_order(:'basket_order','in_progress');select public.transition_order(:'basket_order','work_done');select public.transition_order(:'basket_order','final_pending');
+select public.confirm_bank_payment(:'basket_order',1350,'BANK-TEST-002');
+select pg_temp.assert_true((select paid_cents=2701 and status='delivered'from public.orders where id=:'basket_order'),'Druga IBAN uplata otključava isporuku');
+reset role;
+select pg_temp.assert_true((select count(*)=2 from public.payments where order_id=:'basket_order')and(select count(*)=2 from public.audit_logs where action='bank_payment.confirmed'and details->>'order_id'=:'basket_order'),'Obje IBAN rate imaju po jedan zapis uplate i audit');
+set role authenticated;select set_config('request.jwt.claim.sub','99999999-9999-4999-8999-999999999999',false);
+select public.cart_add(:'cart_first',1);select public.cart_add(:'cart_second',2);
+select pg_temp.assert_true((select count(*)=2 from public.cart_items),'Drugi kupac vidi samo svoju košaricu');
+select pg_temp.expect_error(format('select public.cart_add(%L,100)',:'cart_first'),'Zbrajanje ne prelazi najviše 100 komada');
+select public.checkout_cart_order(gen_random_uuid(),'Kartična košarica','Detaljne upute za kartičnu narudžbu',now()+interval'2 day','card','full','{"course":"Tablice"}',null)as card_order \gset
+select pg_temp.assert_true((select total_cents=2999 and payment_model='full'and payment_method='card'from public.orders where id=:'card_order'),'Kartična košarica ima jednu objedinjenu cijenu');
+select public.choose_order_payment(:'card_order','bank');
+select pg_temp.assert_true((select payment_method='bank'and bank_instructions->>'iban'='DE89370400440532013000'from public.orders where id=:'card_order'),'Prije naplate kupac može odabrati IBAN za postojeću narudžbu');
+select public.choose_order_payment(:'card_order','card');
+select pg_temp.assert_true((select bank_instructions is null from public.orders where id=:'card_order'),'Povratak na karticu uklanja stare IBAN upute');
+reset role;
+select pg_temp.assert_true((public.reserve_payment(:'card_order','99999999-9999-4999-8999-999999999999')).amount_cents=2999,'Stripe rezervacija pokriva cijelu košaricu u jednoj naplati');
+set role authenticated;select set_config('request.jwt.claim.sub','99999999-9999-4999-8999-999999999999',false);
+select pg_temp.expect_error(format('select public.choose_order_payment(%L,''bank'')',:'card_order'),'Započeta Stripe naplata sprječava paralelno prebacivanje na IBAN');
+reset role;set role anon;
+select pg_temp.expect_error('select public.cart_pricing(null)','Anonimni korisnik ne čita košarice');
+select pg_temp.expect_error('select public.checkout_options()','Anonimni korisnik ne čita privatnu naplatu');
+reset role;

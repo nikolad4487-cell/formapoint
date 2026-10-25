@@ -1,3 +1,4 @@
+import { CartPage, CatalogOrderPage } from './pages/cart';
 import { ContactInquiries } from './pages/admin/inquiries';
 import { PlatformSettings } from './pages/admin/settings';
 import { CatalogAdmin } from './pages/admin/catalog';
@@ -21,8 +22,6 @@ import {
   DashboardPage,
   OrdersPage,
   OrderDetailPage,
-  NewOrderPage,
-  CartPage,
   PaymentsPage,
   FilesPage,
   MessagesPage,
@@ -118,7 +117,7 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="app" element={<DashboardLayout />}>
             <Route index element={<DashboardPage />} />
-            <Route path="nova-narudzba" element={<NewOrderPage />} />
+            <Route path="nova-narudzba" element={<CatalogOrderPage />} />
             <Route path="narudzbe" element={<OrdersPage />} />
             <Route path="narudzbe/:id" element={<OrderDetailPage />} />
             <Route path="kosarica" element={<CartPage />} />

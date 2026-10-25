@@ -1,3 +1,4 @@
+import { AddToCartButton } from './add-to-cart';
 import { useSiteSettings } from '../hooks/use-site-settings';
 import { BrandMark } from './brand-mark';
 import type { ReactNode } from 'react';
@@ -118,6 +119,7 @@ export function ServiceCard({ service }: { service: Service }) {
           Saznaj više <ArrowUpRight size={16} />
         </Link>
       </div>
+      <AddToCartButton service={service} />
     </article>
   );
 }

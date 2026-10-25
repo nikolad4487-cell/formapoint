@@ -36,7 +36,7 @@ test('košarica mijenja količinu preko API-ja i uklanja stavku', async ({ page 
   await expect(page.locator('.cart-total')).toContainText('50,02');
   await page.getByRole('button', { name: 'Ukloni', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Košarica je prazna' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Potvrdi narudžbe' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Nastavi na narudžbu' })).toHaveCount(0);
 });
 test('plaćanja koriste API podatke i ne prikazuju neaktivne metode kao aktivne', async ({
   page,

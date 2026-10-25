@@ -1,3 +1,4 @@
+import { OrderPayment } from '../components/order-payment';
 import { EuroInput } from '../components/euro-input';
 import { eurosToCents, centsToEuroInput } from '../lib/currency';
 import { AdminDashboardExtras } from './admin/overview';
@@ -16,21 +17,20 @@ import { PageNote } from '../components/brand';
 import { PaymentMethods } from '../components/payment-methods';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
   ArrowRight,
+  ShoppingBag,
+  Gift,
   Plus,
   Download,
   Folder,
   FileText,
-  ShoppingBag,
   CreditCard,
-  Gift,
   Clock3,
   Send,
   Upload,
-  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../hooks/use-auth';
 import { useRows, useServices } from '../hooks/use-data';
@@ -57,7 +57,6 @@ import type {
   Quote,
   OrderStatus,
   Service,
-  CartItem,
 } from '../lib/domain';
 import { installments, statuses, transitions } from '../lib/domain';
 import { localDate, money } from '../lib/utils';
@@ -421,7 +420,10 @@ export function NewOrderPage() {
     setStep(Math.min(7, step + 1));
   }
   async function submit() {
-    if (!s) return;
+    if (!s || s.price_cents !== null) {
+      toast.error('Artikle s cijenom dodajte u košaricu.');
+      return;
+    }
     setBusy(true);
     try {
       const id = await rpc<string>('create_order', {
@@ -458,7 +460,7 @@ export function NewOrderPage() {
   return (
     <>
       <PageHeader
-        title="Nova narudžba"
+        title="Zahtjev za individualnu ponudu"
         description="Recite nam što trebate. Dogovor počinje jasnim uputama."
       />
       <nav className="wizard-steps" aria-label="Koraci narudžbe">
@@ -477,23 +479,25 @@ export function NewOrderPage() {
         {step === 0 && (
           <QueryState query={services}>
             <div className="stack">
-              {services.data?.map((x) => (
-                <button
-                  key={x.id}
-                  onClick={() =>
-                    setDraft({ ...draft, service: x.slug, model: 'full', quantity: 1 })
-                  }
-                  className={`select-card ${s?.id === x.id ? 'selected' : ''}`}
-                >
-                  <span className="service-icon">
-                    <ServiceIcon name={x.icon} />
-                  </span>
-                  <div>
-                    <h3>{x.name}</h3>
-                    <p>{x.price_cents === null ? 'Prema ponudi' : money(x.price_cents)}</p>
-                  </div>
-                </button>
-              ))}
+              {services.data
+                ?.filter((x) => x.price_cents === null)
+                .map((x) => (
+                  <button
+                    key={x.id}
+                    onClick={() =>
+                      setDraft({ ...draft, service: x.slug, model: 'full', quantity: 1 })
+                    }
+                    className={`select-card ${s?.id === x.id ? 'selected' : ''}`}
+                  >
+                    <span className="service-icon">
+                      <ServiceIcon name={x.icon} />
+                    </span>
+                    <div>
+                      <h3>{x.name}</h3>
+                      <p>{x.price_cents === null ? 'Prema ponudi' : money(x.price_cents)}</p>
+                    </div>
+                  </button>
+                ))}
             </div>
           </QueryState>
         )}
@@ -664,6 +668,12 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
   const { id } = useParams();
   const q = useRows<Order>('orders', { id: id! });
   const quotes = useRows<Quote>('quotes', { order_id: id! });
+  const orderedItems = useRows<{
+    id: string;
+    name: string;
+    quantity: number;
+    unit_cents: number | null;
+  }>('order_items', { order_id: id! }, 'name');
   const history = useRows<{ id: string; status: string; created_at: string }>(
     'order_status_history',
     { order_id: id! },
@@ -671,19 +681,8 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
   const cache = useQueryClient();
   const [model, setModel] = useState('full');
   const [quoteOpen, setQuoteOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<OrderStatus | null>(null);
   const order = q.data?.[0];
-  async function pay() {
-    setBusy(true);
-    await action(async () => {
-      const { url } = await invoke<{ url: string }>('checkout', { order_id: id });
-      if (!url.startsWith('https://checkout.stripe.com/'))
-        throw new Error('Neočekivana adresa naplate.');
-      window.location.assign(url);
-    }, 'Otvaranje sigurne naplate…');
-    setBusy(false);
-  }
   return (
     <QueryState query={q}>
       {!order ? (
@@ -696,6 +695,28 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
             description={`Kreirano ${localDate(order.created_at)}`}
             actions={<StatusBadge status={order.status} />}
           />
+          {orderedItems.data && orderedItems.data.length > 0 && (
+            <section className="panel">
+              <h2>Naručeni artikli</h2>
+              <ul className="checkout-summary-items">
+                {orderedItems.data.map((item) => (
+                  <li key={item.id}>
+                    <span>
+                      {item.quantity} × {item.name}
+                    </span>
+                    <strong>
+                      {item.unit_cents === null
+                        ? 'Prema ponudi'
+                        : money(item.unit_cents * item.quantity)}
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+              <p>
+                Iznosi stavki su prije popusta. Dogovoreni ukupni iznos uključuje odobreni popust.
+              </p>
+            </section>
+          )}
           <div className="stat-grid">
             <StatCard
               label="Dogovoreni iznos"
@@ -727,8 +748,25 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
             {order.final_payment_due_at && (
               <p>Ugovoreni rok završne uplate: {localDate(order.final_payment_due_at)}</p>
             )}
-            {!admin && ['deposit_pending', 'final_pending'].includes(order.status) && (
-              <PaymentAction busy={busy} pay={() => void pay()} />
+            <OrderPayment order={order} admin={admin} />
+            {order.checkout_details && (
+              <dl className="checkout-details">
+                {Object.entries({
+                  course: 'Predmet / područje',
+                  school: 'Škola / fakultet',
+                  mentor: 'Mentor',
+                  student: 'Učenik / student',
+                  year: 'Razred / godina',
+                  place: 'Mjesto i datum',
+                }).map(([key, label]) =>
+                  order.checkout_details?.[key] ? (
+                    <div key={key}>
+                      <dt>{label}</dt>
+                      <dd>{order.checkout_details[key]}</dd>
+                    </div>
+                  ) : null,
+                )}
+              </dl>
             )}
             <div className="actions">
               {admin &&
@@ -840,27 +878,6 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
         </>
       )}
     </QueryState>
-  );
-}
-function PaymentAction({ busy, pay }: { busy: boolean; pay: () => void }) {
-  const q = useRows<{ stripe_enabled: boolean; maintenance: boolean }>('site_settings');
-  const enabled = q.data?.[0]?.stripe_enabled && !q.data?.[0]?.maintenance;
-  return (
-    <div className="notice">
-      <CreditCard />
-      <div>
-        <p>
-          {enabled
-            ? 'Plaćanje se provodi na službenoj Stripe Checkout stranici. Povratak na ovu stranicu ne potvrđuje uplatu.'
-            : 'Online plaćanje trenutačno nije aktivirano. Nije izvršena nikakva naplata.'}
-        </p>
-        {enabled && (
-          <Button disabled={busy} onClick={pay}>
-            {busy ? 'Otvaranje…' : 'Plati putem Stripea'}
-          </Button>
-        )}
-      </div>
-    </div>
   );
 }
 function QuoteForm({ orderId, done }: { orderId: string; done: () => void }) {
@@ -1182,292 +1199,6 @@ export function FilesPage() {
           )}
         </QueryState>
       </div>
-    </>
-  );
-}
-export function CartPage() {
-  const cache = useQueryClient();
-  const q = useQuery({
-    queryKey: ['cart'],
-    queryFn: async () => {
-      const { data, error } = await requireDb().from('cart_items').select('*,services(*)');
-      if (error) throw error;
-      return data as CartItem[];
-    },
-  });
-  const services = useServices();
-  const [model, setModel] = useState('full');
-  const [description, setDescription] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [changing, setChanging] = useState<string | null>(null);
-  const navigate = useNavigate();
-  const items = q.data || [];
-  const available = items.every((i) => i.services && i.services.price_cents !== null);
-  const total = items.reduce((n, i) => n + (i.services?.price_cents || 0) * i.quantity, 0);
-  const split =
-    items.length > 0 &&
-    items.every(
-      (i) =>
-        i.services?.split_enabled &&
-        (i.services?.price_cents || 0) * i.quantity >= (i.services?.split_min_cents || 0),
-    );
-  useEffect(() => {
-    if (!split) setModel('full');
-  }, [split]);
-  async function quantity(item: CartItem, n: number) {
-    if (changing || n < 0 || n > 100) return;
-    setChanging(item.id);
-    await action(async () => {
-      await rpc('cart_set', { p_service: item.service_id, p_quantity: n });
-      await cache.invalidateQueries({ queryKey: ['cart'] });
-    });
-    setChanging(null);
-  }
-  return (
-    <>
-      <PageHeader
-        title="Košarica"
-        description="Pregledajte odabrane usluge, prilagodite količine i potvrdite narudžbe."
-        actions={<PageNote>Sve vaše usluge na jednom mjestu!</PageNote>}
-      />
-      <QueryState query={q}>
-        <div className="cart-layout">
-          <div>
-            <section className="panel cart-items">
-              <div className="panel-heading">
-                <h2>Odabrane usluge ({items.length})</h2>
-                <Link to="/usluge">
-                  Sve usluge <ArrowRight size={15} />
-                </Link>
-              </div>
-              {items.length ? (
-                items.map((i) => (
-                  <article
-                    className={`cart-item service-${i.services?.icon || 'FileText'}`}
-                    key={i.id}
-                  >
-                    <span className="service-icon">
-                      <ServiceIcon name={i.services?.icon || 'FileText'} />
-                    </span>
-                    <div className="cart-item-copy">
-                      <h3>{i.services?.name || 'Nedostupna usluga'}</h3>
-                      <p>
-                        {i.services?.description ||
-                          'Usluga više nije u aktivnom katalogu. Uklonite je prije potvrde.'}
-                      </p>
-                      <div className="cart-item-meta">
-                        {i.services && (
-                          <>
-                            <span>
-                              <Clock3 size={14} />
-                              {i.services.delivery_days
-                                ? `Okvirno ${i.services.delivery_days} dana`
-                                : 'Rok prema dogovoru'}
-                            </span>
-                            <span>
-                              <FileText size={14} />
-                              {i.services.revisions} revizija
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="cart-item-controls">
-                      <label>
-                        Količina
-                        <div className="quantity-stepper">
-                          <button
-                            aria-label={`Smanji količinu: ${i.services?.name || 'usluga'}`}
-                            disabled={!!changing || i.quantity <= 1}
-                            onClick={() => void quantity(i, i.quantity - 1)}
-                          >
-                            −
-                          </button>
-                          <input
-                            aria-label={`Količina: ${i.services?.name || 'usluga'}`}
-                            type="number"
-                            min={1}
-                            max={100}
-                            value={i.quantity}
-                            disabled={!!changing}
-                            onChange={(e) => {
-                              const n = Number(e.target.value);
-                              if (Number.isInteger(n) && n >= 1 && n <= 100) void quantity(i, n);
-                            }}
-                          />
-                          <button
-                            aria-label={`Povećaj količinu: ${i.services?.name || 'usluga'}`}
-                            disabled={!!changing || i.quantity >= 100}
-                            onClick={() => void quantity(i, i.quantity + 1)}
-                          >
-                            +
-                          </button>
-                        </div>
-                      </label>
-                      <div>
-                        <small>Cijena stavke</small>
-                        <strong>
-                          {i.services?.price_cents != null
-                            ? money(i.services.price_cents * i.quantity)
-                            : 'Nije dostupna'}
-                        </strong>
-                      </div>
-                      <button
-                        className="remove-item"
-                        disabled={!!changing}
-                        onClick={() => void quantity(i, 0)}
-                      >
-                        <Trash2 size={15} />
-                        Ukloni
-                      </button>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <EmptyState
-                  title="Košarica je prazna"
-                  description="Dodajte uslugu s definiranim cjenikom ili pošaljite individualni zahtjev."
-                  action={
-                    <Button asChild>
-                      <Link to="/app/nova-narudzba">
-                        Nova narudžba <ArrowRight size={16} />
-                      </Link>
-                    </Button>
-                  }
-                />
-              )}
-            </section>
-            <section className="panel">
-              <div className="panel-heading">
-                <h2>Možda vas zanima i ovo?</h2>
-                <Link to="/usluge">
-                  Sve usluge <ArrowRight size={15} />
-                </Link>
-              </div>
-              <QueryState query={services}>
-                <div className="cart-suggestions">
-                  {services.data
-                    ?.filter((s) => !items.some((i) => i.service_id === s.id))
-                    .slice(0, 3)
-                    .map((s) => (
-                      <article key={s.id} className={`service-${s.icon}`}>
-                        <span className="service-icon">
-                          <ServiceIcon name={s.icon} />
-                        </span>
-                        <h3>{s.name}</h3>
-                        <p>{s.description}</p>
-                        {s.price_cents !== null ? (
-                          <Button
-                            variant="ghost"
-                            disabled={!!changing}
-                            onClick={() =>
-                              void action(async () => {
-                                await rpc('cart_set', { p_service: s.id, p_quantity: 1 });
-                                await cache.invalidateQueries({ queryKey: ['cart'] });
-                              })
-                            }
-                          >
-                            Dodaj u košaricu <ArrowRight size={14} />
-                          </Button>
-                        ) : (
-                          <Link className="text-link" to={`/usluge/${s.slug}`}>
-                            Zatraži ponudu <ArrowRight size={14} />
-                          </Link>
-                        )}
-                      </article>
-                    ))}
-                </div>
-              </QueryState>
-            </section>
-          </div>
-          <aside>
-            <form
-              className="panel cart-summary"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setBusy(true);
-                const ok = await action(async () => {
-                  await rpc('checkout_cart', { p_description: description, p_model: model });
-                  await cache.invalidateQueries();
-                  navigate('/app/narudzbe');
-                }, 'Narudžbe su kreirane. Otvorite pojedinu narudžbu za plaćanje.');
-                if (!ok) setBusy(false);
-              }}
-            >
-              <h2>Sažetak narudžbe</h2>
-              <dl>
-                <dt>Ukupno stavki</dt>
-                <dd>{items.length}</dd>
-                <dt>Informativni međuzbroj</dt>
-                <dd>{available ? money(total) : 'Nedostupno'}</dd>
-              </dl>
-              <div className="cart-total">
-                <strong>Ukupno</strong>
-                <strong>{available ? money(total) : 'Nedostupno'}</strong>
-              </div>
-              <p className="summary-caption">
-                Konačnu cijenu provjerava poslužitelj. Stavke postaju zasebne narudžbe i naplate.
-              </p>
-              <label>
-                Upute za narudžbe
-                <textarea
-                  required
-                  minLength={10}
-                  maxLength={10000}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Opišite željeni rezultat i važne napomene."
-                />
-              </label>
-              <fieldset className="payment-models">
-                <legend>Opcije plaćanja</legend>
-                <label className={model === 'full' ? 'selected' : ''}>
-                  <input
-                    type="radio"
-                    name="model"
-                    value="full"
-                    checked={model === 'full'}
-                    onChange={() => setModel('full')}
-                  />
-                  <strong>100 % unaprijed</strong>
-                  <span>Puni iznos prije početka izrade.</span>
-                  <b>{available ? money(total) : '—'}</b>
-                </label>
-                <label className={model === 'split' ? 'selected' : ''}>
-                  <input
-                    type="radio"
-                    name="model"
-                    value="split"
-                    disabled={!split}
-                    checked={model === 'split'}
-                    onChange={() => setModel('split')}
-                  />
-                  <strong>50/50 plaćanje</strong>
-                  <span>
-                    {split
-                      ? 'Dva dijela za svaku narudžbu.'
-                      : 'Nije dostupno za sve odabrane stavke.'}
-                  </span>
-                  {split && <b>Prema planu svake narudžbe</b>}
-                </label>
-              </fieldset>
-              <div className="promo-note">
-                <Gift size={22} />
-                <p>
-                  Imate promo kôd? Unesite ga u obrazac{' '}
-                  <Link to="/app/nova-narudzba">pojedinačne nove narudžbe</Link>.
-                </p>
-              </div>
-              <Button disabled={busy || !!changing || !items.length || !available}>
-                {busy ? 'Spremanje…' : 'Potvrdi narudžbe'}
-                <ArrowRight size={17} />
-              </Button>
-              <small>Potvrdom se ne izvršava uplata.</small>
-            </form>
-            <PaymentMethods compact />
-          </aside>
-        </div>
-      </QueryState>
     </>
   );
 }

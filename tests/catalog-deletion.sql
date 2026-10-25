@@ -3,7 +3,8 @@ insert into public.service_categories(name,slug)values('Brisanje test','brisanje
 insert into public.services(name,slug,description,category,price_cents)values('Novi artikl za brisanje','brisanje-test','Opis artikla','Brisanje test',2000)returning id as delete_service \gset
 update public.services set price_cents=2500 where id=:'delete_service';
 insert into public.service_variants(service_id,name,price_cents)values(:'delete_service','Varijanta',3000);
-insert into public.service_options(service_id,name)values(:'delete_service','Opcija');
+insert into public.service_options(service_id,name)values(:'delete_service','Opcija')returning id as delete_option \gset
+insert into public.service_option_values(option_id,name,price_cents)values(:'delete_option','Vrijednost',100);
 insert into public.promo_codes(code,kind,value,max_uses,expires_at,service_id)values('DELETEITEM','percent',5,10,now()+interval'1 day',:'delete_service');
 set role authenticated;select set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',false);
 select public.create_order(:'delete_service',1,'Narudžba sa sačuvanim artiklom','Opis prije brisanja artikla',null,'full',null)as delete_order \gset

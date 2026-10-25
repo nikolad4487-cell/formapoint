@@ -56,6 +56,9 @@ export interface Order {
   total_cents: number | null;
   paid_cents: number;
   payment_model: 'full' | 'split';
+  payment_method?: 'card' | 'google_pay' | 'apple_pay' | 'bank';
+  checkout_details?: Record<string, string>;
+  bank_instructions?: { recipient: string; iban: string; bank: string | null } | null;
   due_at: string | null;
   cancellation_deadline_at?: string | null;
   final_payment_due_at?: string | null;

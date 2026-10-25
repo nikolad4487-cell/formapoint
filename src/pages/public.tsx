@@ -1,3 +1,4 @@
+import { AddToCartButton } from '../components/add-to-cart';
 import { usePublishedPage } from '../hooks/use-site-settings';
 import { PublishedText } from './content';
 import { WorkspaceIllustration, BrandBenefit } from '../components/brand';
@@ -410,7 +411,7 @@ export function ServiceDetail() {
               </li>
             )}
           </ul>
-          <LinkButton to={`/app/nova-narudzba?usluga=${s.slug}`}>Zatraži uslugu</LinkButton>
+          <AddToCartButton service={s} />
           <small>Bez naplate prije potvrde uvjeta.</small>
         </aside>
       </div>

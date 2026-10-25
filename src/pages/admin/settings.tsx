@@ -36,6 +36,17 @@ export function PlatformSettings() {
   const site = q.data?.[0],
     business = b.data?.[0];
   const expanded = site?.platform_name !== undefined && business?.notification_email !== undefined;
+  const checkoutReady = useQuery({
+    queryKey: ['admin-checkout-ready'],
+    enabled: tab === 'payments',
+    retry: false,
+    queryFn: async () => {
+      const { error } = await requireDb().rpc('checkout_options');
+      if (error?.code === 'PGRST202' || error?.code === '42883') return false;
+      if (error) throw new Error(error.message);
+      return true;
+    },
+  });
   const health = useQuery({
     queryKey: ['admin-tools-health'],
     retry: false,
@@ -94,6 +105,8 @@ export function PlatformSettings() {
         }
         const payload: Record<string, unknown> = { ...values };
         delete payload.payment_icons;
+        if (tab === 'payments' && checkoutReady.data === true)
+          payload.bank_enabled = data.get('bank_enabled') === 'on';
         const { error } = await requireDb().from('site_settings').update(payload).eq('id', true);
         if (error) throw error;
       } else {
@@ -287,8 +300,8 @@ export function PlatformSettings() {
                       </label>
                     ))}
                     <p>
-                      Ovi podaci ostaju privatni. Spremanje ne aktivira bankovnu naplatu, KEKS Pay
-                      ili Aircash.
+                      Primatelj, IBAN i banka prikazuju se kupcu koji odabere IBAN uplatu. Nakon
+                      spremanja podataka uključite IBAN plaćanje u susjednom obrascu.
                     </p>
                     <Button disabled={busy || !expanded}>Spremi podatke za uplatu</Button>
                   </form>
@@ -304,6 +317,28 @@ export function PlatformSettings() {
                       <label className="checkbox">
                         <input
                           type="checkbox"
+                          name="bank_enabled"
+                          defaultChecked={site.bank_enabled}
+                          disabled={checkoutReady.data !== true}
+                        />
+                        Omogući IBAN plaćanje (jednokratno i 50/50)
+                      </label>
+                      {checkoutReady.data === false && (
+                        <p>
+                          Za košaricu i IBAN primijenite{' '}
+                          <a
+                            className="text-link"
+                            href="/migracije/202610250010_cart_checkout.sql"
+                            download
+                          >
+                            SQL nadogradnju 010
+                          </a>
+                          .
+                        </p>
+                      )}
+                      <label className="checkbox">
+                        <input
+                          type="checkbox"
                           name="stripe_enabled"
                           defaultChecked={site.stripe_enabled}
                         />
@@ -315,7 +350,7 @@ export function PlatformSettings() {
                           name="maintenance"
                           defaultChecked={site.maintenance}
                         />
-                        Način pripreme — online naplata isključena
+                        Način pripreme — svi načini plaćanja isključeni
                       </label>
                       <div className="form-row">
                         <label>

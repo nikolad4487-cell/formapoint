@@ -89,3 +89,5 @@ Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upu
 - [Dodavanje, skrivanje i uklanjanje načina plaćanja](docs/NACINI-PLACANJA.md) — SQL nadogradnja 008 nakon 007. Za objavu Stripe funkcija iz Codespacesa koristite `npm run deploy:stripe` (pakiranje preko `--use-api`).
 
 - [Brisanje početnih i novih artikala te praznih kategorija](docs/BRISANJE-ARTIKALA.md) — jednokratna SQL nadogradnja 009; čuva stare narudžbe i uplate.
+
+- [Košarica, završetak narudžbe i IBAN/Stripe plaćanja](docs/KOSARICA-I-PLACANJE.md) — SQL nadogradnja 010 nakon 006–009.

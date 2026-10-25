@@ -3,6 +3,7 @@ export interface SiteSettings {
   id: boolean;
   platform_name?: string;
   stripe_enabled: boolean;
+  bank_enabled?: boolean;
   maintenance: boolean;
   contact_phone?: string | null;
   public_contact_email?: string | null;

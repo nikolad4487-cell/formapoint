@@ -59,6 +59,7 @@ try {
           '202610240007_icons_first_order.sql',
           '202610240008_payment_methods.sql',
           '202610250009_catalog_deletion.sql',
+          '202610250010_cart_checkout.sql',
         ].includes(file)
           ? `public/migracije/${file}`
           : `supabase/migrations/${file}`,
@@ -77,7 +78,9 @@ try {
         '\n' +
         readFileSync('tests/payment-methods.sql', 'utf8') +
         '\n' +
-        readFileSync('tests/catalog-deletion.sql', 'utf8'),
+        readFileSync('tests/catalog-deletion.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/cart-checkout.sql', 'utf8'),
     ),
   );
   // Dva različita kupona izbjegavaju serijalizaciju samo na retku istog kupona.
@@ -110,6 +113,37 @@ try {
   console.log(
     sql(
       `do $$begin if(select count(*)from public.orders where user_id='77777777-7777-4777-8777-777777777777')<>1 then raise exception 'Više od jedne prve narudžbe';end if;raise notice 'PASS: Istodobne narudžbe s različitim kuponima dopuštaju samo jednu prvu narudžbu';end$$;`,
+    ),
+  );
+  // Dva istodobna klika s istim zahtjevom ne smiju stvoriti dvije košarice/narudžbe.
+  sql(
+    `insert into auth.users(id)values('dddddddd-dddd-4ddd-8ddd-dddddddddddd');set role authenticated;select set_config('request.jwt.claim.sub','dddddddd-dddd-4ddd-8ddd-dddddddddddd',false);select public.cart_add((select id from public.services where slug='checkout-prvi'),1);`,
+  );
+  const checkoutCommand = `set role authenticated;select set_config('request.jwt.claim.sub','dddddddd-dddd-4ddd-8ddd-dddddddddddd',false);begin;select public.checkout_cart_order('cccccccc-cccc-4ccc-8ccc-cccccccccccc','Istodobna košarica','Upute za istodobnu potvrdu košarice',now()+interval'2 day','bank','full','{"course":"Dokumenti"}',null);select pg_sleep(0.3);commit;`;
+  const checkoutTwice = () =>
+    new Promise((resolve, reject) => {
+      const child = spawn(
+        'docker',
+        ['exec', '-i', name, 'psql', '-U', 'postgres', '-v', 'ON_ERROR_STOP=1', '-q'],
+        { stdio: ['pipe', 'ignore', 'pipe'] },
+      );
+      let stderr = '';
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+      child.on('error', reject);
+      child.on('close', (code) => resolve({ code, stderr }));
+      child.stdin.end(checkoutCommand);
+    });
+  const checkoutResults = await Promise.all([checkoutTwice(), checkoutTwice()]);
+  if (checkoutResults.some((r) => r.code !== 0))
+    throw new Error(
+      'Istodobna potvrda košarice nije idempotentna: ' +
+        checkoutResults.map((r) => r.stderr).join('\n'),
+    );
+  console.log(
+    sql(
+      `do $$begin if(select count(*)from public.orders where user_id='dddddddd-dddd-4ddd-8ddd-dddddddddddd')<>1 then raise exception 'Duplicirana košarica';end if;raise notice 'PASS: Istodobna potvrda iste košarice stvara točno jednu narudžbu';end$$;`,
     ),
   );
   console.log(

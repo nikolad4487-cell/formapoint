@@ -108,6 +108,20 @@ export function PaymentMethods({ compact = false }: { compact?: boolean }) {
           </span>
         </div>
       </Link>
+      {site?.bank_enabled && !site.maintenance && (
+        <div className="payment-method-tile enabled">
+          <span className="method-symbol">
+            <CreditCard size={26} />
+          </span>
+          <div>
+            <strong>IBAN uplata</strong>
+            <p>
+              Jednokratno ili 50/50 za artikle koji podržavaju dvije rate. Podaci za uplatu
+              prikazuju se nakon potvrde narudžbe.
+            </p>
+          </div>
+        </div>
+      )}
       <span className="payment-disclaimer">
         <LockKeyhole size={13} />
         Prikazuju se samo aktivirane platne integracije.

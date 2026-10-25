@@ -86,6 +86,7 @@ export async function workspaceFixture(
         id: true,
         platform_name: 'FormaPoint',
         stripe_enabled: stripe,
+        bank_enabled: false,
         maintenance: !stripe,
         contact_phone: '+385 1 000 000',
         public_contact_email: 'kontakt@example.invalid',
@@ -194,6 +195,48 @@ export async function workspaceFixture(
     }
     if (url.pathname.includes('/auth/v1/')) {
       await route.fulfill({ status: 200, headers, body: JSON.stringify({ user }) });
+      return;
+    }
+    if (table === 'checkout_options') {
+      await route.fulfill({
+        status: 200,
+        headers,
+        json: { card: stripe, google_pay: false, apple_pay: false, bank: false },
+      });
+      return;
+    }
+    if (table === 'cart_pricing') {
+      const total = items.reduce(
+        (sum, item) => sum + item.quantity * (item.services?.price_cents || 0),
+        0,
+      );
+      await route.fulfill({
+        status: 200,
+        headers,
+        json: { subtotal: total, discount: 0, total, split: true, count: items.length },
+      });
+      return;
+    }
+    if (table === 'cart_clear') {
+      items = [];
+      await route.fulfill({ status: 200, headers, json: null });
+      return;
+    }
+    if (table === 'cart_add') {
+      const value = request.postDataJSON();
+      const item = items.find((i) => i.service_id === value.p_service);
+      if (item) item.quantity += value.p_quantity;
+      else {
+        const service = fixtureServices.find((s) => s.id === value.p_service)!;
+        items.push({
+          id: crypto.randomUUID(),
+          cart_id: 'cart-test',
+          service_id: service.id,
+          quantity: value.p_quantity,
+          services: service,
+        });
+      }
+      await route.fulfill({ status: 200, headers, json: null });
       return;
     }
     if (table === 'cart_set') {
