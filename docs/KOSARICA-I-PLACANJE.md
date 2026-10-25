@@ -84,3 +84,21 @@ potvrđene prve rate način se zaključava za tu narudžbu.
 `npm run db:test` provjerava stvarni PostgreSQL: više artikala, izračun kupona,
 prvu narudžbu, obje rate, IBAN potvrde, ovlasti i idempotentnost. Playwright testovi
 koriste isključivo lokalne API adaptere; ne šalju novac ni stvarne Stripe zahtjeve.
+
+## Povezivanje ranije dodane IBAN ikone
+
+Ako IBAN u popisu metoda piše da nije povezan, bio je dodan kao prilagođena oznaka.
+Nakon nadogradnje 010 jednom pokrenite cijelu
+[SQL nadogradnju 011](../public/migracije/202610250011_bank_method.sql).
+Ona pretvara raniju IBAN oznaku u bankovnu metodu i zadržava ID i učitanu ikonu.
+Ne uključuje isključenu bankovnu naplatu niti mijenja ranije narudžbe ili uplate.
+
+Spremite primatelja i valjani IBAN, zatim na IBAN kartici odaberite **Prikaži kupcima**.
+To uključuje istu glavnu postavku **Omogući IBAN plaćanje**. Skrivanje ili uklanjanje
+IBAN kartice isključuje bankovnu uplatu za nove narudžbe, a postojeće upute ostaju.
+Nova IBAN kartica dodaje se odabirom **IBAN — bankovna uplata**, a ne kroz drugog pružatelja.
+Ikona se prikazuje uz IBAN u odabiru plaćanja i javnom pregledu metoda.
+Ako je uključen način pripreme, kupci i dalje ne mogu pokrenuti novu naplatu.
+
+PayPal i druge prilagođene oznake ostaju u pripremi dok se ne implementira njihova
+stvarna naplata. Učitavanje PayPal logotipa ne povezuje PayPal račun.

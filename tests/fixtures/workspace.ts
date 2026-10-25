@@ -197,11 +197,37 @@ export async function workspaceFixture(
       await route.fulfill({ status: 200, headers, body: JSON.stringify({ user }) });
       return;
     }
+    if (table === 'configure_bank_method') {
+      const enabled = request.postDataJSON().p_enabled;
+      let method = adminTables.payment_methods.find((m) => m.code === 'iban');
+      if (!method) {
+        method = {
+          id: crypto.randomUUID(),
+          code: 'iban',
+          name: 'IBAN',
+          provider: 'bank',
+          enabled: false,
+          verified: true,
+          icon_url: null,
+          created_at: '2026-10-01T10:00:00Z',
+        };
+        adminTables.payment_methods.push(method);
+      }
+      method.enabled = enabled;
+      adminTables.site_settings[0].bank_enabled = enabled;
+      await route.fulfill({ status: 200, headers, json: null });
+      return;
+    }
     if (table === 'checkout_options') {
       await route.fulfill({
         status: 200,
         headers,
-        json: { card: stripe, google_pay: false, apple_pay: false, bank: false },
+        json: {
+          card: stripe,
+          google_pay: false,
+          apple_pay: false,
+          bank: adminTables.site_settings[0].bank_enabled === true,
+        },
       });
       return;
     }

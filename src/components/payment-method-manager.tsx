@@ -19,8 +19,23 @@ export function PaymentMethodManager() {
     [confirming, setConfirming] = useState<PaymentMethod | null>(null),
     [approved, setApproved] = useState(false),
     [uploadError, setUploadError] = useState(false);
-  const refresh = () => cache.invalidateQueries({ queryKey: ['payment_methods'] });
+  const refresh = () => cache.invalidateQueries();
+  const legacyBank = (method: PaymentMethod) =>
+    method.provider === 'unconnected' &&
+    /^(iban|iban uplata|uplata na iban|bankovna uplata)$/i.test(method.name.trim());
   async function toggle(method: PaymentMethod) {
+    if (method.provider === 'bank') {
+      setBusy(method.id);
+      await action(async () => {
+        const { error } = await requireDb().rpc('configure_bank_method', {
+          p_enabled: !method.enabled,
+        });
+        if (error) throw new Error(error.message);
+        await refresh();
+      });
+      setBusy('');
+      return;
+    }
     if (!method.enabled && ['apple_pay', 'google_pay'].includes(method.code)) {
       setApproved(false);
       setConfirming(method);
@@ -124,20 +139,35 @@ export function PaymentMethodManager() {
             <div className="payment-method-heading">
               <strong>{method.name}</strong>
               <span className="badge">
-                {method.provider === 'unconnected'
-                  ? 'Nije povezana s naplatom'
-                  : method.enabled
-                    ? 'Prikazuje se uz aktivan Stripe'
-                    : 'Skriveno'}
+                {method.provider === 'bank'
+                  ? method.enabled
+                    ? 'IBAN plaćanje uključeno'
+                    : 'IBAN plaćanje isključeno'
+                  : legacyBank(method)
+                    ? 'Potrebno je povezati IBAN'
+                    : method.provider === 'unconnected'
+                      ? 'Nije povezana s naplatom'
+                      : method.enabled
+                        ? 'Prikazuje se uz aktivan Stripe'
+                        : 'Skriveno'}
               </span>
             </div>
             <p>
-              {method.provider === 'unconnected'
-                ? 'Za ovu metodu još nije povezan pružatelj plaćanja. Ne prikazuje se kupcima.'
-                : ['apple_pay', 'google_pay'].includes(method.code)
-                  ? 'Novčanik kroz Stripe Checkout. Dostupnost ovisi i o uređaju kupca.'
-                  : 'Oznaka podržane kartice. Uklanjanje oznake ne blokira karticu u Stripeu.'}
+              {method.provider === 'bank'
+                ? 'Bankovna uplata na spremljeni IBAN. Uključivanje i skrivanje mijenjaju i glavnu IBAN postavku. Primljene uplate potvrđujete nakon provjere bankovnog izvoda.'
+                : legacyBank(method)
+                  ? 'Vaša IBAN ikona je spremljena. Primijenite nadogradnju 011 kako bi se ova kartica povezala s bankovnom uplatom.'
+                  : method.provider === 'unconnected'
+                    ? 'Ovo je pripremljena oznaka i ikona. Naplata ovom metodom još nije integrirana.'
+                    : ['apple_pay', 'google_pay'].includes(method.code)
+                      ? 'Novčanik kroz Stripe Checkout. Dostupnost ovisi i o uređaju kupca.'
+                      : 'Oznaka podržane kartice. Uklanjanje oznake ne blokira karticu u Stripeu.'}
             </p>
+            {legacyBank(method) && (
+              <a className="text-link" href="/migracije/202610250011_bank_method.sql" download>
+                Preuzmi SQL nadogradnju 011 za IBAN
+              </a>
+            )}
             <div className="payment-icon-row">
               <div className="payment-icon-preview">
                 {method.icon_url ? (
@@ -195,7 +225,7 @@ export function PaymentMethodManager() {
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={Boolean(busy) || method.provider !== 'stripe'}
+                disabled={Boolean(busy) || !['stripe', 'bank'].includes(method.provider)}
                 onClick={() => void toggle(method)}
               >
                 {method.enabled ? 'Sakrij kupcima' : 'Prikaži kupcima'}
@@ -232,6 +262,25 @@ export function PaymentMethodManager() {
             const form = new FormData(e.currentTarget);
             setBusy('new');
             const ok = await action(async () => {
+              if (
+                selection === 'iban' ||
+                (selection === 'custom' &&
+                  /^(iban|iban uplata|uplata na iban|bankovna uplata)$/i.test(
+                    String(form.get('name') || '').trim(),
+                  ))
+              ) {
+                if (q.data?.some((m) => m.provider === 'bank'))
+                  throw new Error('IBAN je već dodan. Koristite postojeću IBAN karticu.');
+                const { error } = await requireDb().rpc('configure_bank_method', {
+                  p_enabled: false,
+                });
+                if (error)
+                  throw new Error(
+                    'Za povezivanje IBAN kartice najprije primijenite SQL nadogradnju 011.',
+                  );
+                await refresh();
+                return;
+              }
               const known = stripeMethods.find(([code]) => code === selection);
               const values = known
                 ? {
@@ -266,6 +315,9 @@ export function PaymentMethodManager() {
                     {name} — Stripe
                   </option>
                 ))}
+              {!q.data?.some((m) => m.code === 'iban') && (
+                <option value="iban">IBAN — bankovna uplata</option>
+              )}
               <option value="custom">Druga metoda — priprema</option>
             </select>
           </label>
@@ -286,6 +338,11 @@ export function PaymentMethodManager() {
                 naplata.
               </p>
             </>
+          ) : selection === 'iban' ? (
+            <p>
+              Dodajte IBAN karticu, spremite primatelja i IBAN u Podaci za uplatu pa uključite
+              bankovno plaćanje.
+            </p>
           ) : (
             <p>
               Za Apple Pay i Google Pay prvo uključite novčanik na svom Stripe računu i provjerite
@@ -337,8 +394,9 @@ export function PaymentMethodManager() {
         title="Ukloniti način plaćanja iz prikaza?"
       >
         <p>
-          Uklanja se spremljeni naziv i ikona iz popisa aplikacije. Za promjenu naplate na Stripe
-          računu koristite Stripe Dashboard ili glavni prekidač naplate.
+          {deleting?.provider === 'bank'
+            ? 'Uklanjanje IBAN kartice isključuje IBAN za nove narudžbe. Postojeće narudžbe, upute za uplatu i potvrđene uplate ostaju sačuvane.'
+            : 'Uklanja se spremljeni naziv i ikona iz popisa aplikacije. Za promjenu naplate na Stripe računu koristite Stripe Dashboard ili glavni prekidač naplate.'}
         </p>
         <Button
           type="button"

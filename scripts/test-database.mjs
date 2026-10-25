@@ -52,6 +52,10 @@ try {
       sql(
         `update public.site_settings set payment_icons='${JSON.stringify({ visa: 'https://example.invalid/previous-visa.png', keks: 'https://example.invalid/old-keks.png' })}'::jsonb;`,
       );
+    if (file === '202610250011_bank_method.sql')
+      sql(
+        `insert into public.payment_methods(id,code,name,provider,icon_url)values('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1','custom_iban_fixture','IBAN','unconnected','https://example.invalid/uploaded-iban.png');`,
+      );
     sql(
       readFileSync(
         [
@@ -60,6 +64,7 @@ try {
           '202610240008_payment_methods.sql',
           '202610250009_catalog_deletion.sql',
           '202610250010_cart_checkout.sql',
+          '202610250011_bank_method.sql',
         ].includes(file)
           ? `public/migracije/${file}`
           : `supabase/migrations/${file}`,
@@ -80,7 +85,9 @@ try {
         '\n' +
         readFileSync('tests/catalog-deletion.sql', 'utf8') +
         '\n' +
-        readFileSync('tests/cart-checkout.sql', 'utf8'),
+        readFileSync('tests/cart-checkout.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/bank-method.sql', 'utf8'),
     ),
   );
   // Dva različita kupona izbjegavaju serijalizaciju samo na retku istog kupona.

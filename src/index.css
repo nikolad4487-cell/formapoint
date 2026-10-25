@@ -2350,3 +2350,10 @@ input[type='file'] {
     grid-template-columns: 1fr;
   }
 }
+.checkout-method-icon {
+  width: 44px;
+  height: 32px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 8px;
+}

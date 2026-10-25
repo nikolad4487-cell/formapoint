@@ -4,7 +4,7 @@ export interface PaymentMethod {
   id: string;
   code: string;
   name: string;
-  provider: 'stripe' | 'unconnected';
+  provider: 'stripe' | 'bank' | 'unconnected';
   enabled: boolean;
   verified: boolean;
   icon_url: string | null;
@@ -33,9 +33,10 @@ export function usePublicPaymentMethods() {
       return (data as PaymentMethod[]).filter(
         (m) =>
           m.enabled &&
-          m.provider === 'stripe' &&
-          stripeMethods.some(([code]) => code === m.code) &&
-          (['visa', 'mastercard'].includes(m.code) || m.verified),
+          ((m.provider === 'bank' && m.code === 'iban') ||
+            (m.provider === 'stripe' &&
+              stripeMethods.some(([code]) => code === m.code) &&
+              (['visa', 'mastercard'].includes(m.code) || m.verified))),
       );
     },
   });

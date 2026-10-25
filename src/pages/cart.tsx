@@ -1,3 +1,4 @@
+import { usePublicPaymentMethods } from '../hooks/use-payment-methods';
 import { AddToCartButton } from '../components/add-to-cart';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -104,6 +105,7 @@ const emptyDraft: Draft = {
   place: '',
 };
 export function CartPage() {
+  const methodIcons = usePublicPaymentMethods();
   const cache = useQueryClient();
   const navigate = useNavigate();
   const { session } = useAuth();
@@ -528,6 +530,25 @@ export function CartPage() {
                               disabled={!supportedModel || !allowed(c) || busy}
                               onChange={() => setSelection(c.id)}
                             />
+                            {(() => {
+                              const icon = methodIcons.data?.find(
+                                (m) =>
+                                  m.code ===
+                                  (method === 'bank'
+                                    ? 'iban'
+                                    : method === 'card'
+                                      ? 'visa'
+                                      : method),
+                              )?.icon_url;
+                              return icon ? (
+                                <img
+                                  className="checkout-method-icon"
+                                  src={icon}
+                                  alt=""
+                                  referrerPolicy="no-referrer"
+                                />
+                              ) : null;
+                            })()}
                             <strong>{c.label}</strong>
                             {!options.data?.[method] && <span>Trenutačno nije aktivirano.</span>}
                             {!supportedModel && <span>Dostupno uz jednokratno plaćanje.</span>}

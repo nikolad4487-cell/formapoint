@@ -78,3 +78,80 @@ test('nenadograđena baza nudi točnu SQL datoteku za metode plaćanja', async (
     '/migracije/202610240008_payment_methods.sql',
   );
 });
+
+test('IBAN kartica uključuje bankovno plaćanje i pokazuje učitanu ikonu u naplati', async ({
+  page,
+}) => {
+  await page.goto('/admin/postavke');
+  await page.getByRole('button', { name: 'Uplate i pravila' }).click();
+  await page.getByRole('button', { name: 'Dodaj način plaćanja', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Metoda', exact: true }).selectOption('iban');
+  await page.getByRole('button', { name: 'Dodaj metodu', exact: true }).click();
+  const iban = page
+    .locator('.managed-payment-method')
+    .filter({ has: page.getByText('IBAN', { exact: true }) });
+  await expect(iban).toContainText('IBAN plaćanje isključeno');
+  const source = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 16;
+    canvas.height = 16;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#142168';
+    ctx.fillRect(0, 0, 16, 16);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page
+    .getByLabel('Učitaj ikonu IBAN', { exact: true })
+    .setInputFiles({
+      name: 'iban.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(source, 'base64'),
+    });
+  await expect(iban.getByRole('img', { name: 'Ikona IBAN' })).toBeVisible();
+  await iban.getByRole('button', { name: 'Prikaži kupcima' }).click();
+  await expect(iban).toContainText('IBAN plaćanje uključeno');
+  await expect(page.getByLabel('Omogući IBAN plaćanje (jednokratno i 50/50)')).toBeChecked();
+  await page.goto('/app/placanja');
+  await expect(page.getByRole('img', { name: 'IBAN', exact: true })).toBeVisible();
+  await expect(page.locator('.custom-payment-icons')).not.toContainText('IBAN');
+  await page.goto('/app/kosarica');
+  await page.getByRole('button', { name: 'Nastavi na narudžbu' }).click();
+  await page.getByLabel('Naslov / tema zadatka').fill('Pregled bankovne ikone');
+  await page.getByLabel('Predmet / područje').fill('Dokumenti');
+  await page.getByLabel('Rok isporuke').fill('2035-12-20T14:00');
+  await page
+    .getByLabel('Detaljne upute', { exact: true })
+    .fill('Uredite dokument prema zadanim uputama.');
+  await page.getByRole('button', { name: 'Nastavi na plaćanje' }).click();
+  await expect(page.getByRole('radio', { name: /IBAN - jednokratno/ })).toBeEnabled();
+  await expect(
+    page
+      .getByRole('radio', { name: /IBAN - jednokratno/ })
+      .locator('..')
+      .locator('img'),
+  ).toBeVisible();
+});
+
+test('stara prilagođena IBAN kartica nudi povezivanje uz očuvanje ikone', async ({ page }) => {
+  await page.route('**/rest/v1/payment_methods*', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'legacy-iban',
+          code: 'custom_iban',
+          name: 'IBAN',
+          provider: 'unconnected',
+          enabled: false,
+          verified: false,
+          icon_url: null,
+        },
+      ],
+    }),
+  );
+  await page.goto('/admin/postavke');
+  await page.getByRole('button', { name: 'Uplate i pravila' }).click();
+  await expect(page.getByText('Potrebno je povezati IBAN')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Preuzmi SQL nadogradnju 011 za IBAN' }),
+  ).toHaveAttribute('href', '/migracije/202610250011_bank_method.sql');
+});

@@ -22,7 +22,7 @@ export function PaymentMethods({ compact = false }: { compact?: boolean }) {
   const q = usePaymentAvailability();
   const site = useSiteSettings().data;
   const methods = usePublicPaymentMethods();
-  const visible =
+  const visible = (
     methods.data === null
       ? ['visa', 'mastercard']
           .filter((code) => site?.payment_icons?.[code])
@@ -30,9 +30,12 @@ export function PaymentMethods({ compact = false }: { compact?: boolean }) {
             id: code,
             code,
             name: code === 'visa' ? 'Visa' : 'Mastercard',
+            provider: 'stripe' as const,
             icon_url: site!.payment_icons![code],
           }))
-      : methods.data || [];
+      : methods.data || []
+  ).filter((m) => m.provider === 'stripe');
+  const bankMethod = methods.data?.find((m) => m.provider === 'bank' && m.code === 'iban');
   const active = configured && q.data === true;
   return (
     <section
@@ -111,7 +114,16 @@ export function PaymentMethods({ compact = false }: { compact?: boolean }) {
       {site?.bank_enabled && !site.maintenance && (
         <div className="payment-method-tile enabled">
           <span className="method-symbol">
-            <CreditCard size={26} />
+            {bankMethod?.icon_url ? (
+              <img
+                className="checkout-method-icon"
+                src={bankMethod.icon_url}
+                alt="IBAN"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <CreditCard size={26} />
+            )}
           </span>
           <div>
             <strong>IBAN uplata</strong>

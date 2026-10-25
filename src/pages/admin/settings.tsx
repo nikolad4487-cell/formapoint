@@ -318,6 +318,7 @@ export function PlatformSettings() {
                         <input
                           type="checkbox"
                           name="bank_enabled"
+                          key={String(site.bank_enabled)}
                           defaultChecked={site.bank_enabled}
                           disabled={checkoutReady.data !== true}
                         />

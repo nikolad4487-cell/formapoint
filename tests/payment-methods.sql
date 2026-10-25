@@ -1,5 +1,5 @@
 reset role;
-select pg_temp.assert_true((select count(*)=2 and bool_and(code in('visa','mastercard'))from public.payment_methods),'Početni popis sadrži samo Visa i Mastercard');
+select pg_temp.assert_true((select count(*)=2 and bool_and(code in('visa','mastercard'))from public.payment_methods where provider='stripe'),'Početni popis sadrži samo Visa i Mastercard');
 select pg_temp.assert_true((select icon_url='https://example.invalid/previous-visa.png'from public.payment_methods where code='visa'),'Migracija čuva prethodno učitanu ikonu kartice');
 set role authenticated;select set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',false);
 insert into public.payment_methods(code,name,provider)values('apple_pay','Apple Pay','stripe')returning id as apple_id \gset

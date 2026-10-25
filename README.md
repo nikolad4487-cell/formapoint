@@ -91,3 +91,4 @@ Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upu
 - [Brisanje početnih i novih artikala te praznih kategorija](docs/BRISANJE-ARTIKALA.md) — jednokratna SQL nadogradnja 009; čuva stare narudžbe i uplate.
 
 - [Košarica, završetak narudžbe i IBAN/Stripe plaćanja](docs/KOSARICA-I-PLACANJE.md) — SQL nadogradnja 010 nakon 006–009.
+- IBAN kartica i prethodno učitana ikona povezuju se s bankovnom uplatom kroz [SQL nadogradnju 011](public/migracije/202610250011_bank_method.sql), nakon 010.
