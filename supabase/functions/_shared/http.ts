@@ -1,3 +1,4 @@
+import { allowedAppOrigin } from './app-url.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 export function env(name: string) {
   const value = Deno.env.get(name);
@@ -14,7 +15,7 @@ export function headers(req: Request) {
   const app = Deno.env.get('APP_URL');
   return {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': origin === app ? origin : 'null',
+    'Access-Control-Allow-Origin': allowedAppOrigin(origin, app),
     'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     Vary: 'Origin',

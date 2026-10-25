@@ -87,6 +87,7 @@ Uključite Stripe i isključite način pripreme u aplikaciji. Prije otvaranja ku
 ## Ako naplata ne radi
 
 - „Online plaćanje nije aktivirano”: provjerite spremljena dva prekidača u FormaPoint postavkama.
+- Preglednik prijavljuje generičku grešku, a u bazi nema pokušaja naplate: provjerite `APP_URL` u **Supabase → Edge Functions → Secrets**. Upišite `https://www.formapoint.online` bez završne `/` i koristite tu adresu aplikacije. Starija objava funkcije uspoređuje Origin doslovno i odbija vrijednost s kosom crtom. Nova verzija normalizira završnu kosu crtu, dopušta obje poznate FormaPoint produkcijske domene i gradi povratne adrese bez dvostrukog `/`. Za primjenu koda u Codespacesu pokrenite `git pull --ff-only`, zatim `npm run deploy:stripe`. Promjena frontend koda sama ne ažurira Edge funkcije.
 - Checkout daje pogrešku: provjerite objavu `checkout`, zapis funkcije, Stripe Secret key i točno podudaranje `APP_URL` s domenom preglednika.
 - Stripe je naplatio, a narudžba čeka uplatu: provjerite dostavu webhooka i njegov Signing secret. Ispravite uzrok pa u Stripeu ponovite dostavu istog stvarnog događaja. Ne naplaćujte kupcu ponovno.
 - Live ključ ne radi: provjerite `STRIPE_LIVE_ENABLED=true` i pripadnost live webhook odredišta.
