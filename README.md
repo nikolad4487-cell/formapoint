@@ -87,3 +87,5 @@ Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upu
 - [Stripe: postavljanje testne i stvarne naplate](docs/STRIPE-POSTAVLJANJE.md)
 - [Učitavanje ikona i popusti samo za prvu narudžbu](docs/IKONE-I-PRVA-NARUDZBA.md) — jednokratna SQL nadogradnja 007 nakon 006.
 - [Dodavanje, skrivanje i uklanjanje načina plaćanja](docs/NACINI-PLACANJA.md) — SQL nadogradnja 008 nakon 007. Za objavu Stripe funkcija iz Codespacesa koristite `npm run deploy:stripe` (pakiranje preko `--use-api`).
+
+- [Brisanje početnih i novih artikala te praznih kategorija](docs/BRISANJE-ARTIKALA.md) — jednokratna SQL nadogradnja 009; čuva stare narudžbe i uplate.

@@ -253,3 +253,72 @@ test('CSV izvoz transakcija prikazuje iznose i naknade u eurima', async ({ page 
   expect(csv).toContain('Bruto (EUR)');
   expect(csv).toContain('"12,51";"0,00";"0,42"');
 });
+
+test('brisanje artikla traži potvrdu i osvježava katalog', async ({ page }) => {
+  const { fixtureServices } = await import('../fixtures/workspace');
+  let rows = fixtureServices.map((s) => ({ ...s }));
+  let deleted = '';
+  await page.route('**/rest/v1/services?*', async (route) => route.fulfill({ json: rows }));
+  await page.route('**/rest/v1/rpc/admin_delete_service', async (route) => {
+    deleted = route.request().postDataJSON().p_service;
+    rows = rows.filter((s) => s.id !== deleted);
+    await route.fulfill({ json: null });
+  });
+  await page.goto('/admin/usluge');
+  const name = rows[0].name;
+  await page.getByRole('button', { name: `Izbriši ${name}`, exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Postojeće narudžbe');
+  await dialog.getByRole('button', { name: 'Odustani' }).click();
+  expect(deleted).toBe('');
+  await page.getByRole('button', { name: `Izbriši ${name}`, exact: true }).click();
+  await dialog.getByRole('button', { name: 'Trajno izbriši' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: `Izbriši ${name}`, exact: true })).toHaveCount(0);
+  expect(deleted).toBe(fixtureServices[0].id);
+});
+
+test('nedostajuća nadogradnja brisanja prikazuje SQL i čuva artikl', async ({ page }) => {
+  const { fixtureServices } = await import('../fixtures/workspace');
+  await page.route('**/rest/v1/rpc/admin_delete_service', async (route) =>
+    route.fulfill({
+      status: 404,
+      json: { code: 'PGRST202', message: 'Function not found' },
+    }),
+  );
+  await page.goto('/admin/usluge');
+  const name = fixtureServices[0].name;
+  await page.getByRole('button', { name: `Izbriši ${name}`, exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Trajno izbriši' }).click();
+  await expect(
+    page.getByRole('dialog').getByRole('link', { name: 'SQL nadogradnju 009' }),
+  ).toHaveAttribute('href', '/migracije/202610250009_catalog_deletion.sql');
+  await page.getByRole('dialog').getByRole('button', { name: 'Odustani' }).click();
+  await expect(page.getByRole('button', { name: `Izbriši ${name}`, exact: true })).toBeVisible();
+});
+
+test('brisanje neprazne kategorije prikazuje poruku poslužitelja', async ({ page }) => {
+  await page.route('**/rest/v1/rpc/admin_delete_category', async (route) =>
+    route.fulfill({
+      status: 400,
+      json: {
+        code: 'P0001',
+        message:
+          'Najprije izbrišite artikle iz ove kategorije ili ih premjestite u drugu kategoriju.',
+      },
+    }),
+  );
+  await page.goto('/admin/kategorije');
+  await page
+    .getByRole('button', { name: /^Izbriši / })
+    .first()
+    .click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Trajno izbriši' }).click();
+  await expect(
+    page.getByText(
+      'Najprije izbrišite artikle iz ove kategorije ili ih premjestite u drugu kategoriju.',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole('dialog')).toBeVisible();
+});

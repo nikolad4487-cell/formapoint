@@ -1,3 +1,4 @@
+import { DeleteCatalogItem } from '../components/delete-catalog-item';
 import { eurosToCents } from '../lib/currency';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -16,8 +17,6 @@ export function AdminServices() {
   const [editing, setEditing] = useState<Service | undefined>();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const cache = useQueryClient();
-  const [deleting, setDeleting] = useState<Service | null>(null);
   return (
     <>
       <PageHeader
@@ -59,9 +58,7 @@ export function AdminServices() {
                   >
                     Uredi
                   </Button>
-                  <Button variant="ghost" onClick={() => setDeleting(s)}>
-                    Izbriši
-                  </Button>
+                  <DeleteCatalogItem id={s.id} name={s.name} />
                 </div>
               </div>
             ))}
@@ -73,29 +70,6 @@ export function AdminServices() {
         title={editing ? 'Uredi uslugu' : 'Nova usluga'}
       >
         <ServiceEditor service={editing} done={() => setOpen(false)} />
-      </ConfirmationDialog>
-      <ConfirmationDialog
-        open={!!deleting}
-        onOpenChange={() => setDeleting(null)}
-        title="Izbrisati uslugu?"
-      >
-        <p>Povezane narudžbe mogu spriječiti brisanje. U tom slučaju deaktivirajte uslugu.</p>
-        <Button
-          variant="destructive"
-          onClick={() =>
-            void action(async () => {
-              const { error } = await requireDb().from('services').delete().eq('id', deleting!.id);
-              if (error)
-                throw new Error(
-                  'Usluga se koristi i ne može se izbrisati. Deaktivirajte je kroz uređivanje.',
-                );
-              setDeleting(null);
-              await cache.invalidateQueries();
-            })
-          }
-        >
-          Izbriši
-        </Button>
       </ConfirmationDialog>
     </>
   );
@@ -161,33 +135,36 @@ export function CategoriesPage() {
 function CategoryRow({ category }: { category: { id: string; name: string; slug: string } }) {
   const cache = useQueryClient();
   return (
-    <form
-      className="panel"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        const f = new FormData(e.currentTarget);
-        await action(async () => {
-          const { error } = await requireDb()
-            .from('service_categories')
-            .update({ name: f.get('name'), slug: f.get('slug') })
-            .eq('id', category.id);
-          if (error) throw error;
-          await cache.invalidateQueries();
-        });
-      }}
-    >
-      <div className="form-row">
-        <label>
-          Naziv
-          <input name="name" required defaultValue={category.name} />
-        </label>
-        <label>
-          Slug
-          <input name="slug" required pattern="[a-z0-9-]+" defaultValue={category.slug} />
-        </label>
-      </div>
-      <Button variant="outline">Spremi kategoriju</Button>
-    </form>
+    <>
+      <form
+        className="panel"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const f = new FormData(e.currentTarget);
+          await action(async () => {
+            const { error } = await requireDb()
+              .from('service_categories')
+              .update({ name: f.get('name'), slug: f.get('slug') })
+              .eq('id', category.id);
+            if (error) throw error;
+            await cache.invalidateQueries();
+          });
+        }}
+      >
+        <div className="form-row">
+          <label>
+            Naziv
+            <input name="name" required defaultValue={category.name} />
+          </label>
+          <label>
+            Slug
+            <input name="slug" required pattern="[a-z0-9-]+" defaultValue={category.slug} />
+          </label>
+        </div>
+        <Button variant="outline">Spremi kategoriju</Button>
+      </form>
+      <DeleteCatalogItem id={category.id} name={category.name} category />
+    </>
   );
 }
 export function QuotesPage() {

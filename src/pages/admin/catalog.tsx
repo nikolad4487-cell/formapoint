@@ -1,3 +1,4 @@
+import { DeleteCatalogItem } from '../../components/delete-catalog-item';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Pencil } from 'lucide-react';
@@ -53,6 +54,7 @@ export function CatalogAdmin() {
                   <div className="panel-heading">
                     <h2>{c.name}</h2>
                     <div className="actions table-actions">
+                      <DeleteCatalogItem id={c.id} name={c.name} category />
                       <Link className="text-link" to="/admin/kategorije">
                         <Pencil size={15} />
                         Uredi kategoriju
@@ -104,17 +106,20 @@ export function CatalogAdmin() {
                                 <StatusBadge status={s.active ? 'active' : 'inactive'} />
                               </td>
                               <td>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditing(s);
-                                    setCategory(c.name);
-                                    setOpen(true);
-                                  }}
-                                >
-                                  Uredi
-                                </Button>
+                                <div className="actions table-actions">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditing(s);
+                                      setCategory(c.name);
+                                      setOpen(true);
+                                    }}
+                                  >
+                                    Uredi
+                                  </Button>
+                                  <DeleteCatalogItem id={s.id} name={s.name} />
+                                </div>
                               </td>
                             </tr>
                           ))}

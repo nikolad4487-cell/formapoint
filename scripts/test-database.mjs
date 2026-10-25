@@ -58,6 +58,7 @@ try {
           '202610240006_admin_tools.sql',
           '202610240007_icons_first_order.sql',
           '202610240008_payment_methods.sql',
+          '202610250009_catalog_deletion.sql',
         ].includes(file)
           ? `public/migracije/${file}`
           : `supabase/migrations/${file}`,
@@ -74,7 +75,9 @@ try {
         '\n' +
         readFileSync('tests/commerce.sql', 'utf8') +
         '\n' +
-        readFileSync('tests/payment-methods.sql', 'utf8'),
+        readFileSync('tests/payment-methods.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/catalog-deletion.sql', 'utf8'),
     ),
   );
   // Dva različita kupona izbjegavaju serijalizaciju samo na retku istog kupona.
