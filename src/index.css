@@ -2357,3 +2357,7 @@ input[type='file'] {
   vertical-align: middle;
   margin-right: 8px;
 }
+
+.checkout-plans.single-plan {
+  grid-template-columns: 1fr;
+}

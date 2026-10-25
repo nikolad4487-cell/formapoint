@@ -159,7 +159,11 @@ export function CartPage() {
   useEffect(() => {
     sessionStorage.setItem(storageKey, JSON.stringify({ draft, requestId, promo }));
   }, [draft, requestId, promo, storageKey]);
-  const chosen = choices.find((c) => c.id === selection)!;
+  const selected = choices.find((c) => c.id === selection)!;
+  const chosen =
+    selected.model === 'split' && !price.data?.split
+      ? choices.find((c) => c.method === selected.method && c.model === 'full')!
+      : selected;
   const allowed = (c: (typeof choices)[number]) =>
     !!options.data?.[c.method] && (c.model !== 'split' || !!price.data?.split);
   const total = price.data?.total;
@@ -469,39 +473,41 @@ export function CartPage() {
                     )}
                   </section>
                   <section className="panel">
-                    <fieldset className="payment-models checkout-plans">
+                    <fieldset
+                      className={`payment-models checkout-plans ${price.data?.split ? '' : 'single-plan'}`}
+                    >
                       <legend>Odaberite model plaćanja</legend>
-                      {(['full', 'split'] as const).map((model) => (
-                        <label key={model} className={chosen.model === model ? 'selected' : ''}>
-                          <input
-                            type="radio"
-                            name="plan"
-                            value={model}
-                            checked={chosen.model === model}
-                            disabled={busy || (model === 'split' && !price.data?.split)}
-                            onChange={() =>
-                              setSelection(
-                                `${['card', 'bank'].includes(chosen.method) ? chosen.method : 'card'}_${model}`,
-                              )
-                            }
-                          />
-                          <strong>
-                            {model === 'full'
-                              ? 'Plaćanje u cijelosti (100%)'
-                              : 'Plaćanje u 2 rate (50% + 50%)'}
-                          </strong>
-                          <span>
-                            {model === 'full'
-                              ? 'Puni iznos prije početka izrade.'
-                              : price.data?.split
-                                ? '50% prije izrade, 50% nakon izrade i prije isporuke.'
-                                : '50/50 nije dostupno za sve odabrane artikle.'}
-                          </span>
-                          {total != null && (
-                            <b>{money(model === 'split' ? Math.ceil(total / 2) : total)} sada</b>
-                          )}
-                        </label>
-                      ))}
+                      {(['full', 'split'] as const)
+                        .filter((model) => model === 'full' || price.data?.split === true)
+                        .map((model) => (
+                          <label key={model} className={chosen.model === model ? 'selected' : ''}>
+                            <input
+                              type="radio"
+                              name="plan"
+                              value={model}
+                              checked={chosen.model === model}
+                              disabled={busy}
+                              onChange={() =>
+                                setSelection(
+                                  `${['card', 'bank'].includes(chosen.method) ? chosen.method : 'card'}_${model}`,
+                                )
+                              }
+                            />
+                            <strong>
+                              {model === 'full'
+                                ? 'Plaćanje u cijelosti (100%)'
+                                : 'Plaćanje u 2 rate (50% + 50%)'}
+                            </strong>
+                            <span>
+                              {model === 'full'
+                                ? 'Puni iznos prije početka izrade.'
+                                : '50% prije izrade, 50% nakon izrade i prije isporuke.'}
+                            </span>
+                            {total != null && (
+                              <b>{money(model === 'split' ? Math.ceil(total / 2) : total)} sada</b>
+                            )}
+                          </label>
+                        ))}
                     </fieldset>
                   </section>
                   <section className="panel">
