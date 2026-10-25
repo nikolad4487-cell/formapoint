@@ -7,3 +7,5 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 supabase/.temp/
+
+public/pdfjs/

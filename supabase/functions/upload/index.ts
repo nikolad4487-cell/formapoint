@@ -38,16 +38,20 @@ serve(async (req) => {
   )
     throw new Error('Neispravna datoteka');
   const db = admin();
-  await checked(db.rpc('rate_limit', { k: `upload:${u.id}`, max_hits: 20, seconds: 3600 }));
   const order = await checked(db.from('orders').select('user_id').eq('id', oid).single());
   const roles = await checked(db.from('user_roles').select('role').eq('user_id', u.id));
   const isAdmin = (roles || []).some((r) => r.role === 'ADMIN');
   if (!order) throw new Error('Narudžba ne postoji');
   if ((order.user_id !== u.id && !isAdmin) || (kind !== 'attachment' && !isAdmin))
     throw new Error('Nemate pristup');
+  await checked(
+    db.rpc('rate_limit', { k: `upload:${u.id}`, max_hits: isAdmin ? 500 : 20, seconds: 3600 }),
+  );
   const ext = file.name.split('.').at(-1)?.toLowerCase() || '';
   const fmt = formats[ext];
   if (!fmt) throw new Error('Format nije dopušten');
+  if (kind === 'preview' && !['png', 'jpg', 'jpeg'].includes(ext))
+    throw new Error('Pregled mora biti zasebna slika rada.');
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (fmt.magic && !fmt.magic.every((v, i) => bytes[i] === v))
     throw new Error('Sadržaj se ne podudara s formatom');
@@ -61,7 +65,7 @@ serve(async (req) => {
   await checked(
     db.storage.from('order-files').upload(path, bytes, { contentType: fmt.mime, upsert: false }),
   );
-  const { error } = await db
+  const { data, error } = await db
     .from('order_files')
     .insert({
       order_id: oid,
@@ -71,10 +75,16 @@ serve(async (req) => {
       kind,
       size: file.size,
       scan_status: 'quarantined',
-    });
+    })
+    .select('id')
+    .single();
   if (error) {
     await db.storage.from('order-files').remove([path]);
     throw error;
   }
-  return json(req, { ok: true, message: 'Datoteka zaprimljena i čeka sigurnosnu provjeru.' });
+  return json(req, {
+    ok: true,
+    file_id: data.id,
+    message: 'Datoteka zaprimljena i čeka sigurnosnu provjeru.',
+  });
 });

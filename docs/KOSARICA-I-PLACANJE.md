@@ -102,3 +102,53 @@ Ako je uključen način pripreme, kupci i dalje ne mogu pokrenuti novu naplatu.
 
 PayPal i druge prilagođene oznake ostaju u pripremi dok se ne implementira njihova
 stvarna naplata. Učitavanje PayPal logotipa ne povezuje PayPal račun.
+
+## Pregled rada prije završne uplate
+
+Jednokratna IBAN uplata sada ima opis **jednokratna uplata**, bez brojeva rata.
+Oznake **IBAN 1. uplata** i **IBAN 2. uplata** vrijede samo za ugovoreni model 50/50.
+Nedostupni model 50/50 skriven je u odabiru modela, uključujući ponude koje ne
+zadovoljavaju najmanji iznos za dvije rate.
+
+Za ovu promjenu **nije potreban novi SQL**, ali objavite postojeće funkcije za
+datoteke iz Codespaces terminala:
+
+```bash
+git pull --ff-only
+npm install
+npm run deploy:files
+```
+
+Ako Supabase CLI traži prijavu, pokrenite `npx supabase login`, zatim ponovite
+`npm run deploy:files`. Nisu potrebni novi ključevi ili Stripe postavke.
+Frontend se i dalje objavljuje automatski kroz Vercel. Nakon objave osvježite
+aplikaciju da se učita novi prikaz i novi dio za datoteke.
+
+U detaljima administratorske narudžbe odaberite **Završni rad i pregled za korisnika**
+pa **Prenesi rad i objavi pregled**. Za PDF, PNG i JPG automatski nastaju zasebne
+JPEG stranice s vodenim žigom. Za Word/Excel/PowerPoint u dodatno polje priložite
+PDF ili sliku za pregled. Izvornik se sprema odvojeno u privatnu pohranu i zadržava
+postojeću sigurnosnu provjeru. Pregledi se ponovno kodiraju u raster bez ugrađenog
+sadržaja te se ta obrada evidentira kao odobrenje pregleda.
+
+PDF mora imati najviše 64 stranice; odjednom je moguće pripremiti najviše 64
+stranice pregleda i svaka izvorna datoteka smije imati do 20 MB. Dulji rad podijelite
+na više datoteka/prijenosa. Fontovi i PDF resursi dolaze s iste domene aplikacije,
+a vlasnikov rad ne šalje se vanjskom servisu za konverziju.
+
+Za narudžbu 50/50 s potvrđenom prvom uplatom objava završnog rada i pregleda označava
+rad dovršenim te postavlja status **Čeka završnu uplatu**. Kupcu se prikazuju druga
+rata i pregled rada. Za čistu jednokratnu narudžbu ne stvara se druga uplata.
+Kupac pregledava stranice jednim gumbom **Pregledaj rad** i navigacijom među stranicama.
+Izvorni završni PDF/Word/Excel/PowerPoint nije dostupan tim putem.
+
+Poslužitelj izdaje poveznicu na završni original tek nakon potvrde cijele uplate
+i sigurnosne provjere izvornika. To vrijedi i za izravni API zahtjev; `preview`
+parametar i stari `download_override` ne zaobilaze provjeru uplate. Administrator
+zadržava pristup sigurnosno provjerenim izvornicima radi vođenja narudžbe.
+Privitke koristite za korisničke upute i slične materijale, a završni original
+uvijek označite kao **Završni rad**.
+
+Korisnikov otvoreni detalj narudžbe provjerava nove datoteke i status uplate svakih
+15 sekundi dok je kartica vidljiva i narudžba nije završena ili otkazana. Nakon
+potvrde druge uplate završni se rad otključava ako je prošao sigurnosnu provjeru.

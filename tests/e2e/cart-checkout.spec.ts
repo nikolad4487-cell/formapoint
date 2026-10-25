@@ -196,6 +196,7 @@ test('postavke odvojeno spremaju IBAN i uključuju bankovno plaćanje', async ({
     iban: 'HR1210010051863000160',
     payment_recipient: 'Test primatelj',
   });
+  await expect(page.getByRole('button', { name: 'Spremi podatke za uplatu' })).toBeEnabled();
   await page.getByLabel('Omogući IBAN plaćanje (jednokratno i 50/50)').check();
   const settingWrite = page.waitForRequest(
     (r) => r.method() === 'PATCH' && r.url().includes('/site_settings'),

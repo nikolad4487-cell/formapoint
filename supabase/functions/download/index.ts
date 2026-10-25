@@ -1,7 +1,8 @@
 import { admin, checked, json, serve, user, uuid } from '../_shared/http.ts';
 serve(async (req) => {
   const u = await user(req);
-  const { file_id } = await req.json();
+  const { file_id, action } = await req.json();
+  const preview = action === 'preview';
   if (!uuid(file_id)) throw new Error('Neispravan zahtjev');
   const db = admin();
   const file = await checked(db.from('order_files').select('*').eq('id', file_id).single());
@@ -13,15 +14,26 @@ serve(async (req) => {
   if (
     file.kind === 'final' &&
     !isAdmin &&
-    !order.download_override &&
     (!order.total_cents || order.paid_cents < order.total_cents)
   )
-    throw new Error('Završna uplata nije potvrđena');
+    return json(req, { error: 'Završna datoteka zaključana je do potvrde cijele uplate.' }, 403);
+  if (preview && file.kind !== 'preview')
+    return json(req, { error: 'Za pregled otvorite zaseban pregled rada.' }, 403);
+  if (!isAdmin && file.kind === 'preview' && !preview)
+    return json(req, { error: 'Pregled rada dostupan je kroz preglednik.' }, 403);
   const signed = await checked(
-    db.storage.from('order-files').createSignedUrl(file.path, 60, { download: file.name }),
+    db.storage
+      .from('order-files')
+      .createSignedUrl(file.path, 60, preview ? undefined : { download: file.name }),
   );
   await checked(
-    db.from('audit_logs').insert({ actor_id: u.id, action: 'file.download', entity_id: file.id }),
+    db
+      .from('audit_logs')
+      .insert({
+        actor_id: u.id,
+        action: preview ? 'file.preview' : 'file.download',
+        entity_id: file.id,
+      }),
   );
   if (!signed) throw new Error('Poveznica nije kreirana');
   const signedUrl = new URL(signed.signedUrl);

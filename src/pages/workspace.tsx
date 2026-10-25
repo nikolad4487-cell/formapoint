@@ -1,3 +1,6 @@
+import { WorkPreviewGallery } from '../components/work-preview-gallery';
+import { WorkDeliveryUpload } from '../components/work-delivery-upload';
+import { WorkPreview } from '../components/work-preview';
 import { OrderPayment } from '../components/order-payment';
 import { EuroInput } from '../components/euro-input';
 import { eurosToCents, centsToEuroInput } from '../lib/currency';
@@ -597,9 +600,11 @@ export function NewOrderPage() {
               <div className="notice">
                 <CreditCard />
                 <p>
-                  {installments(total, draft.model === 'split')
-                    .map((x, i) => `${i + 1}. uplata: ${money(x)}`)
-                    .join(' · ')}
+                  {draft.model === 'split'
+                    ? installments(total, true)
+                        .map((x, i) => `${i + 1}. uplata: ${money(x)}`)
+                        .join(' · ')
+                    : `Jednokratna uplata: ${money(total)}`}
                   . Iznosi su informativni prije provjere kupona.
                 </p>
               </div>
@@ -683,6 +688,15 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [confirm, setConfirm] = useState<OrderStatus | null>(null);
   const order = q.data?.[0];
+  useEffect(() => {
+    if (admin || !order || ['completed', 'cancelled'].includes(order.status)) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      void q.refetch();
+      void cache.invalidateQueries({ queryKey: ['order_files'] });
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [admin, order?.id, order?.status, q.refetch, cache]);
   return (
     <QueryState query={q}>
       {!order ? (
@@ -799,7 +813,9 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
                         Model plaćanja
                         <select value={model} onChange={(e) => setModel(e.target.value)}>
                           <option value="full">100 %</option>
-                          {quote.split_enabled && <option value="split">50/50</option>}
+                          {quote.split_enabled && quote.total_cents >= 200 && (
+                            <option value="split">50/50</option>
+                          )}
                         </select>
                       </label>
                       <div className="actions">
@@ -1029,7 +1045,6 @@ export function ConversationPanel({
 export function OrderFiles({ orderId, admin = false }: { orderId: string; admin?: boolean }) {
   const q = useRows<OrderFile>('order_files', { order_id: orderId });
   const [files, setFiles] = useState<File[]>([]);
-  const [kind, setKind] = useState('attachment');
   const [busy, setBusy] = useState(false);
   const cache = useQueryClient();
   return (
@@ -1037,50 +1052,53 @@ export function OrderFiles({ orderId, admin = false }: { orderId: string; admin?
       <h2>Datoteke narudžbe</h2>
       <QueryState query={q}>
         {q.data?.length ? (
-          q.data.map((f) => <FileRow key={f.id} file={f} />)
+          <>
+            {!admin && <WorkPreviewGallery files={q.data} />}
+            {q.data
+              .filter((file) => admin || file.kind !== 'preview' || file.scan_status !== 'clean')
+              .map((f) => (
+                <FileRow key={f.id} file={f} />
+              ))}
+          </>
         ) : (
           <EmptyState title="Još nema datoteka" />
         )}
       </QueryState>
-      <FilePicker files={files} setFiles={setFiles} />
-      {admin && (
-        <label>
-          Vrsta
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="attachment">Privitak</option>
-            <option value="preview">Pregled rada</option>
-            <option value="final">Završni rad</option>
-          </select>
-        </label>
+      {admin ? (
+        <WorkDeliveryUpload orderId={orderId} />
+      ) : (
+        <>
+          <FilePicker files={files} setFiles={setFiles} />
+          <Button
+            className="actions"
+            variant="outline"
+            disabled={busy || !files.length}
+            onClick={async () => {
+              setBusy(true);
+              const ok = await action(async () => {
+                for (const file of files) {
+                  const form = new FormData();
+                  form.set('file', file);
+                  form.set('order_id', orderId);
+                  form.set('kind', 'attachment');
+                  const { error } = await requireDb().functions.invoke('upload', { body: form });
+                  if (error)
+                    throw new Error(
+                      'Prijenos nije uspio. Već prenesene datoteke prikazane su nakon osvježavanja.',
+                    );
+                }
+                await cache.invalidateQueries({ queryKey: ['order_files'] });
+              }, 'Datoteke čekaju sigurnosnu provjeru.');
+              if (ok) setFiles([]);
+              else await cache.invalidateQueries({ queryKey: ['order_files'] });
+              setBusy(false);
+            }}
+          >
+            <Upload size={15} />
+            Prenesi datoteke
+          </Button>
+        </>
       )}
-      <Button
-        className="actions"
-        variant="outline"
-        disabled={busy || !files.length}
-        onClick={async () => {
-          setBusy(true);
-          const ok = await action(async () => {
-            for (const file of files) {
-              const form = new FormData();
-              form.set('file', file);
-              form.set('order_id', orderId);
-              form.set('kind', kind);
-              const { error } = await requireDb().functions.invoke('upload', { body: form });
-              if (error)
-                throw new Error(
-                  'Prijenos nije uspio. Već prenesene datoteke prikazane su nakon osvježavanja.',
-                );
-            }
-            await cache.invalidateQueries({ queryKey: ['order_files'] });
-          }, 'Datoteke čekaju sigurnosnu provjeru.');
-          if (ok) setFiles([]);
-          else await cache.invalidateQueries({ queryKey: ['order_files'] });
-          setBusy(false);
-        }}
-      >
-        <Upload size={15} />
-        Prenesi datoteke
-      </Button>
       <small>
         Datoteke su privatne. Preuzimanje je moguće tek nakon sigurnosne provjere i provjere uplate
         za završni rad.
@@ -1090,6 +1108,13 @@ export function OrderFiles({ orderId, admin = false }: { orderId: string; admin?
 }
 function FileRow({ file }: { file: OrderFile }) {
   const { role } = useAuth();
+  const order = useRows<Order>('orders', { id: file.order_id });
+  const payment = order.data?.[0];
+  const locked =
+    file.kind === 'final' &&
+    role !== 'ADMIN' &&
+    !(payment?.total_cents && payment.paid_cents >= payment.total_cents);
+  const [previewUrl, setPreviewUrl] = useState('');
   const cache = useQueryClient();
   const [review, setReview] = useState(false);
   const [reason, setReason] = useState('');
@@ -1108,24 +1133,44 @@ function FileRow({ file }: { file: OrderFile }) {
       <Button
         variant="outline"
         size="sm"
-        disabled={file.scan_status !== 'clean'}
+        disabled={file.scan_status !== 'clean' || locked}
         onClick={() =>
-          void action(async () => {
-            const result = await invoke<{ url: string }>('download', { file_id: file.id });
-            const url = new URL(result.url);
-            if (
-              url.protocol !== 'https:' &&
-              url.hostname !== 'localhost' &&
-              url.hostname !== '127.0.0.1'
-            )
-              throw new Error('Neispravna adresa.');
-            window.open(result.url, '_blank', 'noopener,noreferrer');
-          }, 'Preuzimanje je odobreno.')
+          void action(
+            async () => {
+              const result = await invoke<{ url: string }>('download', {
+                file_id: file.id,
+                ...(file.kind === 'preview' ? { action: 'preview' } : {}),
+              });
+              const url = new URL(result.url);
+              if (
+                url.protocol !== 'https:' &&
+                url.hostname !== 'localhost' &&
+                url.hostname !== '127.0.0.1'
+              )
+                throw new Error('Neispravna adresa.');
+              if (file.kind === 'preview') setPreviewUrl(result.url);
+              else window.open(result.url, '_blank', 'noopener,noreferrer');
+            },
+            file.kind === 'preview' ? 'Otvaranje pregleda…' : 'Preuzimanje je odobreno.',
+          )
         }
       >
         <Download size={14} />
-        Preuzmi
+        {file.kind === 'preview'
+          ? 'Pregledaj rad'
+          : locked
+            ? 'Zaključano do cijele uplate'
+            : 'Preuzmi'}
       </Button>
+      <ConfirmationDialog
+        open={!!previewUrl}
+        onOpenChange={(value) => {
+          if (!value) setPreviewUrl('');
+        }}
+        title={`Pregled rada: ${file.name}`}
+      >
+        {previewUrl && <WorkPreview url={previewUrl} file={file} />}
+      </ConfirmationDialog>
       {role === 'ADMIN' && (
         <>
           <Button variant="ghost" size="sm" onClick={() => setReview(true)}>

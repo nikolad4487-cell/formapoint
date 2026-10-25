@@ -2361,3 +2361,21 @@ input[type='file'] {
 .checkout-plans.single-plan {
   grid-template-columns: 1fr;
 }
+.work-preview {
+  max-height: 70vh;
+  overflow: auto;
+  user-select: none;
+}
+.work-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 12px 0;
+  pointer-events: none;
+}
+.work-delivery-upload {
+  margin-top: 24px;
+}
+.work-delivery-upload p {
+  margin-block: 14px;
+}

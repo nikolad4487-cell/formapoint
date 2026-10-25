@@ -21,6 +21,7 @@ export function OrderPayment({ order, admin = false }: { order: Order; admin?: b
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const bank = order.payment_method === 'bank';
+  const split = order.payment_model === 'split';
   const pending = ['deposit_pending', 'final_pending'].includes(order.status);
   const current = installments.data?.find(
     (i) => i.installment === (order.status === 'final_pending' ? 2 : 1),
@@ -31,12 +32,11 @@ export function OrderPayment({ order, admin = false }: { order: Order; admin?: b
       <section className="notice bank-instructions">
         <div>
           <h3>
-            IBAN uplata ·{' '}
-            {order.status === 'final_pending'
-              ? '2. rata nakon izrade'
-              : order.payment_model === 'split'
-                ? '1. rata prije izrade'
-                : 'jednokratno'}
+            {split
+              ? order.status === 'final_pending'
+                ? 'IBAN 2. uplata · nakon izrade'
+                : 'IBAN 1. uplata · prije izrade'
+              : 'IBAN uplata · jednokratno'}
           </h3>
           <dl>
             <dt>Primatelj</dt>
@@ -49,12 +49,17 @@ export function OrderPayment({ order, admin = false }: { order: Order; admin?: b
             <dd>{current ? money(current.amount_cents) : 'Provjera iznosa…'}</dd>
             <dt>Opis plaćanja</dt>
             <dd>
-              {order.number} / {order.status === 'final_pending' ? '2' : '1'}. uplata
+              {order.number} /{' '}
+              {split
+                ? `${order.status === 'final_pending' ? '2' : '1'}. uplata`
+                : 'jednokratna uplata'}
             </dd>
           </dl>
           <p>
-            Uplata se evidentira nakon provjere bankovnog izvoda. Izrada počinje nakon prve uplate,
-            a završne datoteke isporučuju se nakon cijele uplate.
+            Uplata se evidentira nakon provjere bankovnog izvoda.{' '}
+            {split
+              ? 'Izrada počinje nakon prve uplate, a završne datoteke isporučuju se nakon cijele uplate.'
+              : 'Izrada počinje nakon potvrde jednokratne uplate.'}
           </p>
           {!admin && <ChangePaymentMethod order={order} />}
           {admin && (
