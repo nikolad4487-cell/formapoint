@@ -1,3 +1,4 @@
+import { GuestPage } from './pages/guest';
 import { CartPage, CatalogOrderPage } from './pages/cart';
 import { ContactInquiries } from './pages/admin/inquiries';
 import { PlatformSettings } from './pages/admin/settings';
@@ -107,6 +108,7 @@ function App() {
           <Route path="p/:slug" element={<ContentPageView />} />
           <Route path="odjava-newslettera" element={<NewsletterUnsubscribe />} />
           <Route path="kontakt" element={<ContactPage />} />
+          <Route path="kupnja-kao-gost" element={<GuestPage />} />
           <Route path="prijava" element={<AuthPage />} />
           <Route path="registracija" element={<AuthPage mode="register" />} />
           <Route path="zaboravljena-lozinka" element={<AuthPage mode="forgot" />} />

@@ -58,14 +58,11 @@ try {
     );
     assert(signup.user);
     users.push(signup.user.id);
-    assert(!signup.session);
-    const before = await c.auth.signInWithPassword({ email, password });
-    assert(before.error);
-    await must(db.auth.admin.updateUserById(signup.user.id, { email_confirm: true }));
+    assert(signup.session, 'Registracija mora odmah vratiti sesiju bez potvrde e-maila');
     await must(c.auth.signInWithPassword({ email, password }));
     customers.push({ c, email, password, id: signup.user.id });
   }
-  pass('Registracija, obvezna potvrda i stvarna prijava preko Auth API-ja');
+  pass('Registracija bez potvrde e-maila i stvarna prijava preko Auth API-ja');
   const [a, b, administrator] = customers;
   await must(db.from('user_roles').insert({ user_id: administrator.id, role: 'ADMIN' }));
   const service = await must(

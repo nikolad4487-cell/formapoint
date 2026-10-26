@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/prepare-pdf-assets.mjs && vite --host 0.0.0.0",
-    "build": "node scripts/prepare-pdf-assets.mjs && node scripts/build-bank-method-upgrade.mjs --check && node scripts/build-checkout-upgrade.mjs --check && node scripts/build-catalog-upgrade.mjs --check && node scripts/build-payment-methods-upgrade.mjs --check && node scripts/build-commerce-upgrade.mjs --check && node scripts/build-admin-upgrade.mjs --check && node scripts/check-public-config.mjs && tsc -b && vite build && node scripts/check-public-config.mjs --dist",
+    "build": "node scripts/prepare-pdf-assets.mjs && node scripts/build-guest-upgrade.mjs --check && node scripts/build-bank-method-upgrade.mjs --check && node scripts/build-checkout-upgrade.mjs --check && node scripts/build-catalog-upgrade.mjs --check && node scripts/build-payment-methods-upgrade.mjs --check && node scripts/build-commerce-upgrade.mjs --check && node scripts/build-admin-upgrade.mjs --check && node scripts/check-public-config.mjs && tsc -b && vite build && node scripts/check-public-config.mjs --dist",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:e2e": "playwright test",

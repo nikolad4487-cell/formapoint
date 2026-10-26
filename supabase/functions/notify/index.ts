@@ -8,7 +8,15 @@ serve(async (req) => {
   for (const job of jobs) {
     try {
       const { data, error } = await db.auth.admin.getUserById(job.user_id);
-      if (error || !data.user?.email) throw new Error('Primatelj nije dostupan');
+      if (error || !data.user) throw new Error('Primatelj nije dostupan');
+      let recipient = data.user.email;
+      if (data.user.is_anonymous) {
+        const profile = await checked(
+          db.from('profiles').select('contact_email').eq('id', job.user_id).single(),
+        );
+        recipient = profile?.contact_email;
+      }
+      if (!recipient) throw new Error('Primatelj nije dostupan');
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -18,9 +26,9 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           from: env('EMAIL_FROM'),
-          to: [data.user.email],
+          to: [recipient],
           subject: 'FormaPoint – nova obavijest',
-          html: '<div style="font-family:Arial;color:#10183f"><h1 style="color:#3155F6">FormaPoint</h1><p>Imate novu obavijest u svojem radnom prostoru.</p><p>Prijavite se na FormaPoint i otvorite obavijesti.</p></div>',
+          html: '<div style="font-family:Arial;color:#10183f"><h1 style="color:#3155F6">FormaPoint</h1><p>Imate novu obavijest u svojem radnom prostoru.</p><p>Otvorite FormaPoint u pregledniku u kojem ste naručili i pogledajte svoje obavijesti.</p></div>',
         }),
       });
       if (!response.ok) throw new Error('Slanje nije uspjelo');

@@ -57,6 +57,9 @@ export function PublicHeader() {
             ))}
           </nav>
           <div className="header-actions">
+            <Link to="/app/kosarica" aria-label="Košarica">
+              <ShoppingBag size={20} />
+            </Link>
             <Link className="login-link" to="/prijava">
               Prijava <ArrowUpRight size={15} />
             </Link>
@@ -191,7 +194,18 @@ export function ProtectedRoute({ admin = false }: { admin?: boolean }) {
         <Unavailable>{error}</Unavailable>
       </div>
     );
-  if (!session) return <Navigate to="/prijava" state={{ from: location.pathname }} replace />;
+  if (!session) {
+    const purchase =
+      !admin &&
+      ['/app/kosarica', '/app/checkout', '/app/nova-narudzba'].includes(location.pathname);
+    return (
+      <Navigate
+        to={purchase ? '/kupnja-kao-gost' : '/prijava'}
+        state={{ from: location.pathname + location.search }}
+        replace
+      />
+    );
+  }
   if (admin && role !== 'ADMIN') return <Navigate to="/app" replace />;
   return <Outlet />;
 }
@@ -284,7 +298,7 @@ export function DashboardLayout({ admin = false }: { admin?: boolean }) {
   const name =
     [session?.user.user_metadata.first_name, session?.user.user_metadata.last_name]
       .filter(Boolean)
-      .join(' ') || 'Moj račun';
+      .join(' ') || (session?.user.is_anonymous ? 'Gost' : 'Moj račun');
   return (
     <div className="dashboard">
       <a className="skip-link" href="#sadrzaj">
@@ -336,6 +350,13 @@ export function DashboardLayout({ admin = false }: { admin?: boolean }) {
           )}
           <button
             onClick={async () => {
+              if (
+                session?.user.is_anonymous &&
+                !window.confirm(
+                  'Odjavom gubite pristup narudžbama gosta u ovom pregledniku. Želite li nastaviti?',
+                )
+              )
+                return;
               const result = await db!.auth.signOut();
               if (result.error) toast.error('Odjava nije uspjela.');
             }}
@@ -399,6 +420,14 @@ export function DashboardLayout({ admin = false }: { admin?: boolean }) {
           </div>
         </header>
         <main id="sadrzaj" key={location.pathname} className="dashboard-content">
+          {session?.user.is_anonymous && (
+            <section className="panel">
+              <p>Kupujete kao gost. Narudžbe su dostupne u ovom pregledniku.</p>
+              <Button asChild variant="outline">
+                <Link to="/registracija">Spremi pristup izradom računa</Link>
+              </Button>
+            </section>
+          )}
           <Outlet />
         </main>
       </div>

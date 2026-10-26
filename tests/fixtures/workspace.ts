@@ -46,7 +46,14 @@ export async function workspaceFixture(
     empty = false,
     fail = false,
     stripe = false,
-  }: { admin?: boolean; empty?: boolean; fail?: boolean; stripe?: boolean } = {},
+    signedIn = true,
+  }: {
+    admin?: boolean;
+    empty?: boolean;
+    fail?: boolean;
+    stripe?: boolean;
+    signedIn?: boolean;
+  } = {},
 ) {
   const expiry = Math.floor(Date.now() / 1000) + 3600;
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -59,17 +66,18 @@ export async function workspaceFixture(
     app_metadata: { provider: 'email' },
     created_at: '2026-10-01T10:00:00Z',
   };
-  await page.addInitScript(
-    (session) => localStorage.setItem('sb-127-auth-token', JSON.stringify(session)),
-    {
-      access_token: `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: fixtureUser, role: 'authenticated', exp: expiry })}.test-signature`,
-      refresh_token: 'test-only-refresh-token',
-      expires_in: 3600,
-      expires_at: expiry,
-      token_type: 'bearer',
-      user,
-    },
-  );
+  if (signedIn)
+    await page.addInitScript(
+      (session) => localStorage.setItem('sb-127-auth-token', JSON.stringify(session)),
+      {
+        access_token: `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: fixtureUser, role: 'authenticated', exp: expiry })}.test-signature`,
+        refresh_token: 'test-only-refresh-token',
+        expires_in: 3600,
+        expires_at: expiry,
+        token_type: 'bearer',
+        user,
+      },
+    );
   let items = empty
     ? []
     : [

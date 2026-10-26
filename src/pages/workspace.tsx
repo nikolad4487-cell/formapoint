@@ -766,6 +766,8 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
             {order.checkout_details && (
               <dl className="checkout-details">
                 {Object.entries({
+                  guest_name: 'Kupac (gost)',
+                  guest_email: 'Kontaktni e-mail gosta',
                   course: 'Predmet / područje',
                   school: 'Škola / fakultet',
                   mentor: 'Mentor',
@@ -1574,10 +1576,18 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
       </QueryState>
       <div className="panel">
         <h2>Sigurnost i osobni podaci</h2>
-        <p>E-mail računa: {session?.user.email}</p>
+        <p>
+          {session?.user.is_anonymous
+            ? 'Kupujete kao gost. Izradite račun za pristup svojim narudžbama i s drugih uređaja.'
+            : `E-mail računa: ${session?.user.email}`}
+        </p>
         <div className="actions">
           <Button asChild variant="outline">
-            <Link to="/zaboravljena-lozinka">Promijeni lozinku putem e-pošte</Link>
+            <Link to={session?.user.is_anonymous ? '/registracija' : '/zaboravljena-lozinka'}>
+              {session?.user.is_anonymous
+                ? 'Izradi račun i sačuvaj narudžbe'
+                : 'Promijeni lozinku putem e-pošte'}
+            </Link>
           </Button>
           <Button asChild variant="outline">
             <Link to="/app/podrska">Zatraži izvoz ili brisanje podataka</Link>

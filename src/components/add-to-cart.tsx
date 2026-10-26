@@ -29,7 +29,9 @@ export function AddToCartButton({
       disabled={busy}
       onClick={async () => {
         if (!session) {
-          navigate('/prijava', { state: { from: `/app/nova-narudzba?usluga=${service.slug}` } });
+          navigate(
+            `/kupnja-kao-gost?service=${encodeURIComponent(service.id)}&quantity=${quantity}`,
+          );
           return;
         }
         setBusy(true);

@@ -71,9 +71,9 @@ export function AuthPage({
       fieldError('email', { message: 'Unesite ispravnu e-mail adresu.' });
       return;
     }
-    if (passwordMode && v.password.length < (mode === 'login' ? 1 : 12)) {
+    if (passwordMode && v.password.length < (mode === 'login' ? 1 : 8)) {
       fieldError('password', {
-        message: 'Unesite lozinku; nova lozinka treba imati najmanje 12 znakova.',
+        message: 'Unesite lozinku; nova lozinka treba imati najmanje 8 znakova.',
       });
       return;
     }
@@ -94,22 +94,43 @@ export function AuthPage({
         navigate(typeof from === 'string' && from.startsWith('/app') ? from : '/app');
       }
       if (registerMode) {
-        const { error } = await auth.signUp({
-          email: v.email,
-          password: v.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/potvrda-emaila`,
-            data: {
-              first_name: v.first.trim(),
-              last_name: v.last.trim(),
-              phone: v.phone.trim() || null,
-              marketing_consent: v.marketing,
-              terms_accepted_at: new Date().toISOString(),
-            },
-          },
-        });
-        if (error) throw error;
-        navigate('/potvrda-emaila');
+        const metadata = {
+          first_name: v.first.trim(),
+          last_name: v.last.trim(),
+          phone: v.phone.trim() || null,
+          marketing_consent: v.marketing,
+          terms_accepted_at: new Date().toISOString(),
+        };
+        const current = await auth.getSession();
+        if (current.error) throw current.error;
+        if (current.data.session?.user.is_anonymous) {
+          // Add credentials to this guest, preserving ownership of existing orders.
+          const updated = await auth.updateUser({
+            email: v.email,
+            password: v.password,
+            data: metadata,
+          });
+          if (updated.error) throw updated.error;
+          const signed = await auth.signInWithPassword({ email: v.email, password: v.password });
+          if (signed.error) throw signed.error;
+          const profile = await requireDb()
+            .from('profiles')
+            .update(metadata)
+            .eq('id', current.data.session.user.id);
+          if (profile.error) throw profile.error;
+        } else {
+          const { data, error } = await auth.signUp({
+            email: v.email,
+            password: v.password,
+            options: { data: metadata },
+          });
+          if (error) throw error;
+          if (!data.session)
+            throw new Error(
+              'Račun je kreiran, ali automatska prijava nije dostupna. Pokušajte se prijaviti ili se obratite podršci.',
+            );
+        }
+        navigate('/app');
       }
       if (mode === 'forgot') {
         const { error } = await auth.resetPasswordForEmail(v.email, {
@@ -180,11 +201,16 @@ export function AuthPage({
         <h1>{title}</h1>
         <p>
           {registerMode
-            ? 'Otvorite račun i pojednostavite svoje digitalne zadatke.'
+            ? 'Registrirajte se i odmah nastavite u aplikaciju, bez potvrde e-maila.'
             : mode === 'login'
               ? 'Prijavite se u svoj FormaPoint radni prostor.'
               : 'Nastavite sigurno upravljati svojim računom.'}
         </p>
+        {(mode === 'login' || registerMode) && (
+          <p>
+            <Link to="/kupnja-kao-gost">Nastavi kupnju kao gost, bez računa</Link>
+          </p>
+        )}
         {!configured && <Unavailable />}
         {mode === 'confirm' ? (
           <>
@@ -232,6 +258,7 @@ export function AuthPage({
                   <input
                     type={show ? 'text' : 'password'}
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    minLength={mode === 'login' ? 1 : 8}
                     {...register('password')}
                   />
                   <button
