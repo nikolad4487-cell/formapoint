@@ -2,13 +2,13 @@
 
 U **Administracija → Popusti i kuponi → Nova promocija** odaberite Božić, rođendan, Uskrs ili posebnu promociju. Odaberite postotak ili fiksni iznos u eurima, sve korisnike ili odabrane primatelje, uredite poruku i pogledajte primjer e-maila prije izrade.
 
-Svaki odabrani korisnik dobiva zaseban nasumični kod vezan uz njegov račun, s jednim korištenjem. Ako datume ostavite praznima, kod vrijedi odmah do točno 30 dana od kreiranja na poslužitelju. Datumi od/do mogu se zadati ručno. Budući kod šalje se odmah, ali ne može se iskoristiti prije početnog datuma.
+Svaki odabrani korisnik dobiva zaseban nasumični kod vezan uz njegov račun, s jednim korištenjem. Ako datume ostavite praznima, kod vrijedi odmah do točno 30 dana od početka valjanosti na poslužitelju. Datumi od/do mogu se zadati ručno. Budući kod čeka početni datum i vrijeme: tek tada se šalje e-mail i kod se može iskoristiti. Zadani završetak je 30 dana od tog početka.
 
 Rođendanska promocija izrađuje se odabirom slavljenika. Datumi rođenja ne prikupljaju se i nema automatskog godišnjeg rasporeda rođendana.
 
 ## Aktivacija — online, kroz Supabase i Codespaces
 
-1. U Supabase SQL Editoru pokrenite cijelu datoteku `public/migracije/202610260014_personal_promotions.sql`, nakon nadogradnje 012. Nadogradnju 013 za kategorijske slugove zadržite ako je već primijenjena. Ne pokrećite početnu shemu ponovno.
+1. U Supabase SQL Editoru pokrenite cijelu datoteku `public/migracije/202610260014_personal_promotions.sql`, nakon nadogradnje 012. Zatim pokrenite `public/migracije/202610260015_scheduled_promotions.sql` za raspored slanja od početka valjanosti. Ako je 014 već primijenjena, najprije objavite ažurirane funkcije naredbom iz koraka 2, zatim pokrenite samo 015. Nadogradnju 013 za kategorijske slugove zadržite ako je već primijenjena. Ne pokrećite početnu shemu ponovno.
 2. U Codespaces terminalu:
 
    ```sh
@@ -27,7 +27,7 @@ Rođendanska promocija izrađuje se odabirom slavljenika. Datumi rođenja ne pri
 
 ## Automatsko slanje i pozadinski worker
 
-Pritisak na **Izradi kodove i pošalji e-mail** atomarno kreira kodove i evidenciju isporuka te odmah pokreće slanje. Otvorena administracija obrađuje i dodatne skupine primatelja.
+Pritisak na **Izradi kodove i pošalji e-mail**, odnosno **Izradi kodove i zakaži slanje** za budući početak, atomarno kreira kodove i evidenciju isporuka te pokreće slanje ako je početak valjanosti već nastupio. Za budući početak slanje čeka odabrani datum i vrijeme u vremenskoj zoni Europe/Zagreb. Otvorena administracija obrađuje i dodatne skupine primatelja.
 
 Nadogradnja 014 na Supabaseu pokušava uključiti `pg_cron` i `pg_net` te zakazati obradu svake minute. Tako se neslane poruke nastavljaju obrađivati i nakon zatvaranja preglednika. Ključ tog workera generira se u bazi, ostaje zaštićen od korisničkog API-ja i ne upisuje se ručno. Worker može obrađivati isporuke, ali ne može kreirati kampanje.
 
@@ -51,6 +51,6 @@ Kampanja prikazuje broj kodova te statuse poslano, čeka, neuspjelo i preskočen
 
 Kreiranje koristi stabilni identifikator zahtjeva i otisak sadržaja: mrežni ponovni pokušaj ne stvara dodatne kupone. Worker rezervira poslove zaključavanjem i tokenom rezervacije. Slanje koristi stalni Resend idempotency ključ po isporuci; poslane i preskočene poruke ne šalju se ponovno. Automatski neuspjeli pokušaji imaju minutni odmak i najviše tri pokušaja. Gumb Obradi neslane dopušta izričit administratorski ponovni pokušaj unutar izvornog 23-satnog prozora, bez promjene kodova ili identifikatora isporuke. Automatsko ponavljanje ograničeno je na 23 sata od prvog pokušaja kako se ne bi oslanjalo na isteklo razdoblje Resend idempotencije. Nakon tog roka provjerite status isporuke prije ručnog kreiranja nove kampanje.
 
-Jedna kampanja podržava najviše 1000 primatelja. Predlošci nisu sami po sebi kampanje i nikakav e-mail ne šalje se učitavanjem stranice ili primjenom SQL-a.
+Jedna kampanja podržava najviše 1000 primatelja. Slanje buduće kampanje ne troši pokušaje isporuke niti pokreće prozor ponovnog slanja prije početnog datuma. Predlošci nisu sami po sebi kampanje i nikakav e-mail ne šalje se učitavanjem stranice ili primjenom SQL-a.
 
 Provjere baze testiraju osobno vlasništvo, 30-dnevni rok, buduće datume, idempotenciju, privole i rezervacije isporuka. Edge testovi zamjenjuju Resend lokalnim adapterom; Playwright provjerava pregled i kreiranje na računalu i mobitelu. Automatizirani testovi ne šalju stvarne poruke.

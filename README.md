@@ -99,3 +99,5 @@ Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upu
 [Slugovi artikala po kategorijama](docs/SLUGOVI-PO-KATEGORIJAMA.md) – javne putanje `/kategorija/artikl` i SQL nadogradnja 013.
 
 [Personalizirane promocije](docs/PERSONALIZIRANE-PROMOCIJE.md) – Božić, rođendan, Uskrs, osobni kodovi na 30 dana i slanje e-pošte; SQL nadogradnja 014.
+
+Zakazano slanje promocija na početak valjanosti i 30 dana od tog početka: [SQL nadogradnja 015](public/migracije/202610260015_scheduled_promotions.sql), nakon 014.

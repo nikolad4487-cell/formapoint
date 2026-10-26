@@ -36,6 +36,10 @@ select id as delivery2,claim_token as token2 from public.promotion_deliveries wh
 select public.finish_promotion_delivery(:'delivery2',:'token2','sent',null,'fixture-provider-receipt');
 select pg_temp.assert_true(public.claim_promotions(:'promotion',10)='[]'::jsonb,'Poslane i preskočene poruke ne šalju se ponovno');
 select pg_temp.assert_true(public.promotion_worker_authorized((select secret from public.promotion_worker))and not public.promotion_worker_authorized('invalid'),'Interni worker prihvaća samo svoj poslužiteljski ključ');
+select pg_temp.assert_true((select expires_at-starts_at=interval'30 days'from public.promotion_campaigns where id=:'future_promotion'),'Buduća promocija zadano vrijedi 30 dana od svojeg početka');
+select pg_temp.assert_true(public.claim_promotions(:'future_promotion',10)='[]'::jsonb,'Buduća promocija ne šalje se prije početka valjanosti');
+update public.promotion_campaigns set starts_at=now()-interval'1 minute'where id=:'future_promotion';
+update public.promo_codes set starts_at=now()-interval'1 minute'where id in(select promo_id from public.promotion_deliveries where campaign_id=:'future_promotion');
 update public.promotion_deliveries set status='failed',attempts=1,first_attempt_at=now(),next_attempt_at=now()+interval'1 minute'where campaign_id=:'future_promotion';
 select pg_temp.assert_true(public.claim_promotions(:'future_promotion',10)='[]'::jsonb,'Automatski pokušaji poštuju odmak nakon greške');
 update public.promotion_deliveries set first_attempt_at=now()-interval'24 hours',next_attempt_at=now()-interval'1 minute'where campaign_id=:'future_promotion';

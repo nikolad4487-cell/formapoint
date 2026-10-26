@@ -115,3 +115,79 @@ test('neuspješno kreiranje čuva podatke i isti identifikator zahtjeva za sigur
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[0].request_id).toBe(requests[1].request_id);
 });
+
+test.describe('Zakazivanje prema vremenu Hrvatske', () => {
+  test.use({ timezoneId: 'America/New_York' });
+  test('budući početak zakazuje slanje i čuva automatski završetak od 30 dana', async ({
+    page,
+  }) => {
+    await workspaceFixture(page, { admin: true });
+    let created = false;
+    let captured: any;
+    await page.route('**/rest/v1/rpc/personal_promotion_summary', (route) =>
+      route.fulfill({
+        json: created
+          ? [
+              {
+                id: 'd8000000-0000-4000-8000-000000000015',
+                name: 'Zakazani Božić',
+                occasion: 'christmas',
+                recipients: 1,
+                sent: 0,
+                pending: 1,
+                failed: 0,
+                skipped: 0,
+                starts_at: '2030-11-30T23:00:00Z',
+                expires_at: '2030-12-30T23:00:00Z',
+              },
+            ]
+          : [],
+      }),
+    );
+    await page.route('**/functions/v1/promotions', async (route) => {
+      const body = route.request().postDataJSON();
+      if (body.action === 'health')
+        return route.fulfill({
+          json: {
+            schema_ready: true,
+            email_configured: true,
+            worker_ready: true,
+            scheduled_sending_ready: true,
+          },
+        });
+      if (body.action === 'create') {
+        created = true;
+        captured = body;
+        return route.fulfill({
+          json: {
+            campaign_id: 'd8000000-0000-4000-8000-000000000015',
+            claimed: 0,
+            sent: 0,
+            failed: 0,
+            skipped: 0,
+            available: true,
+          },
+        });
+      }
+      return route.fulfill({ json: { claimed: 0, sent: 0, available: true } });
+    });
+    await page.goto('/admin/kuponi');
+    await page.getByRole('button', { name: 'Nova promocija', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Nova personalizirana promocija' });
+    await dialog.getByLabel('Naziv promocije', { exact: true }).fill('Zakazani Božić');
+    await dialog.getByLabel(/Vrijedi od \/ slanje/).fill('2030-12-01T00:00');
+    await expect(dialog.getByLabel(/Vrijedi do/)).toHaveValue('');
+    await dialog
+      .getByRole('button', { name: 'Izradi kodove i zakaži slanje', exact: true })
+      .click();
+    await expect(dialog).toHaveCount(0);
+    expect(captured.starts_at).toBe('2030-11-30T23:00:00.000Z');
+    expect(captured.expires_at).toBeNull();
+    await expect(
+      page.getByText('Osobni kodovi su kreirani. E-mailovi su zakazani za početak valjanosti.'),
+    ).toBeVisible();
+    await expect(
+      page.getByText('1 kodova · 0 poslano · 1 čeka · 0 neuspjelo · 0 preskočeno'),
+    ).toBeVisible();
+  });
+});

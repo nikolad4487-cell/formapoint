@@ -68,6 +68,7 @@ try {
           '202610260012_guest_checkout.sql',
           '202610260013_category_service_slugs.sql',
           '202610260014_personal_promotions.sql',
+          '202610260015_scheduled_promotions.sql',
         ].includes(file)
           ? `public/migracije/${file}`
           : `supabase/migrations/${file}`,
@@ -96,7 +97,9 @@ try {
         '\n' +
         readFileSync('tests/category-slugs.sql', 'utf8') +
         '\n' +
-        readFileSync('tests/personal-promotions.sql', 'utf8'),
+        readFileSync('tests/personal-promotions.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/scheduled-promotions.sql', 'utf8'),
     ),
   );
   // Dva različita kupona izbjegavaju serijalizaciju samo na retku istog kupona.

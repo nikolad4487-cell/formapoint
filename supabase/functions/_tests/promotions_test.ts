@@ -5,6 +5,9 @@ Deno.test(
     const originalServe = Deno.serve,
       originalFetch = globalThis.fetch;
     let handler: (req: Request) => Promise<Response>;
+    let future = false;
+    let scheduleReady = false;
+    let deferred = 0;
     let role = 'CUSTOMER',
       allowed = true,
       hasJob = false,
@@ -60,13 +63,21 @@ Deno.test(
         return json(role === 'ADMIN' ? [{ role: 'ADMIN' }] : []);
       if (url.pathname.endsWith('/rate_limit')) return json(null);
       if (url.pathname === '/rest/v1/promotion_deliveries') {
-        retries++;
         const update = await req.json();
+        if (update.claim_token === null) {
+          deferred++;
+          assert.equal(update.status, 'pending');
+          assert.equal(update.attempts, 0);
+          assert.equal(update.first_attempt_at, null);
+          return json(null);
+        }
+        retries++;
         assert.equal(update.attempts, 0);
         assert.equal(update.first_attempt_at, undefined);
         assert(url.searchParams.get('first_attempt_at')?.startsWith('gt.'));
         return json(null);
       }
+      if (url.pathname.endsWith('/promotion_schedule_ready')) return json(scheduleReady);
       if (url.pathname.endsWith('/promotion_worker_authorized')) return json(workerAllowed);
       if (url.pathname.endsWith('/create_personal_promotion')) {
         created++;
@@ -90,7 +101,11 @@ Deno.test(
           code: 'BOZIC-PERSONAL',
           kind: 'percent',
           value: 15,
-          starts_at: '2026-12-01T10:00:00Z',
+          attempts: 1,
+          first_attempt_at: new Date().toISOString(),
+          starts_at: future
+            ? new Date(Date.now() + 86400000).toISOString()
+            : '2026-10-01T10:00:00Z',
           expires_at: '2026-12-31T10:00:00Z',
           subject: 'Poklon za {ime}',
           message: 'Pozdrav {ime}! Kod {kod}, popust {popust}, od {od} do {do}.',
@@ -150,6 +165,15 @@ Deno.test(
           assert.equal(seenCreate.p_request, campaign);
         },
       );
+      await t.step('buduća promocija traži nadogradnju rasporeda prije izrade kodova', async () => {
+        const before = created;
+        const starts = new Date(Date.now() + 40 * 86400000).toISOString();
+        assert.equal((await request({ ...create, starts_at: starts })).status, 400);
+        assert.equal(created, before);
+        scheduleReady = true;
+        assert.equal((await request({ ...create, starts_at: starts })).status, 200);
+        assert.equal(seenCreate.p_starts, starts);
+      });
       await t.step('odjava nakon kreiranja preskače slanje', async () => {
         hasJob = true;
         allowed = false;
@@ -183,6 +207,19 @@ Deno.test(
         assert.equal(totals.failed, 1);
         assert.equal(statuses.at(-1), 'failed');
       });
+      await t.step(
+        'budući kod se odgađa bez slanja čak i ako ga je stari red već rezervirao',
+        async () => {
+          const before = sent;
+          hasJob = true;
+          future = true;
+          const response = await request({ action: 'process', campaign_id: campaign });
+          assert.equal((await response.json()).deferred, 1);
+          assert.equal(sent, before);
+          assert.equal(deferred, 1);
+          future = false;
+        },
+      );
       await t.step(
         'ručni ponovni pokušaj traži administratora i čuva izvorni prozor idempotencije',
         async () => {

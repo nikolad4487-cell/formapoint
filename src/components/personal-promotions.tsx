@@ -1,3 +1,4 @@
+import { fromZonedTime } from 'date-fns-tz';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -62,6 +63,7 @@ export function PersonalPromotions() {
       callPromotion({ action: 'health' }) as Promise<{
         schema_ready: boolean;
         worker_ready?: boolean;
+        scheduled_sending_ready?: boolean;
         email_configured: boolean;
         missing_email_settings?: string[];
       }>,
@@ -104,6 +106,7 @@ export function PersonalPromotions() {
     },
   });
   const ready = health.data?.schema_ready && health.data.email_configured;
+  const futureStart = !!starts && fromZonedTime(starts, 'Europe/Zagreb').getTime() > Date.now();
   const defaultImage = () =>
     new URL(promotionThemes[occasion].image, window.location.origin).toString();
   function fresh() {
@@ -134,7 +137,12 @@ export function PersonalPromotions() {
         retry: retry && batch === 0,
       });
       await refresh();
-      if (!result.available || !result.claimed) break;
+      if (
+        !result.available ||
+        !result.claimed ||
+        (result.deferred && !result.sent && !result.failed && !result.skipped)
+      )
+        break;
     }
   }
   const sample = {
@@ -151,10 +159,14 @@ export function PersonalPromotions() {
               return 1000;
             }
           })(),
-    starts_at: starts ? new Date(starts).toISOString() : new Date().toISOString(),
+    starts_at: starts
+      ? fromZonedTime(starts, 'Europe/Zagreb').toISOString()
+      : new Date().toISOString(),
     expires_at: expires
-      ? new Date(expires).toISOString()
-      : new Date(Date.now() + 30 * 86400000).toISOString(),
+      ? fromZonedTime(expires, 'Europe/Zagreb').toISOString()
+      : new Date(
+          (starts ? fromZonedTime(starts, 'Europe/Zagreb').getTime() : Date.now()) + 30 * 86400000,
+        ).toISOString(),
     subject,
     message,
     image_url: image || defaultImage(),
@@ -344,12 +356,16 @@ export function PersonalPromotions() {
                 message,
                 image_url: image || null,
                 user_ids: audience === 'selected' ? selected : null,
-                starts_at: starts ? new Date(starts).toISOString() : null,
-                expires_at: expires ? new Date(expires).toISOString() : null,
+                starts_at: starts ? fromZonedTime(starts, 'Europe/Zagreb').toISOString() : null,
+                expires_at: expires ? fromZonedTime(expires, 'Europe/Zagreb').toISOString() : null,
               });
               setOpen(false);
               await refresh();
-              toast.success('Osobni kodovi su kreirani. Status slanja prikazan je uz promociju.');
+              toast.success(
+                starts && fromZonedTime(starts, 'Europe/Zagreb').getTime() > Date.now()
+                  ? 'Osobni kodovi su kreirani. E-mailovi su zakazani za početak valjanosti.'
+                  : 'Osobni kodovi su kreirani. Status slanja prikazan je uz promociju.',
+              );
               await drain(result.campaign_id);
             } catch (e) {
               const message = e instanceof Error ? e.message : 'Promocija nije obrađena.';
@@ -409,7 +425,7 @@ export function PersonalPromotions() {
           </div>
           <div className="form-row">
             <label>
-              Vrijedi od (prazno: odmah)
+              Vrijedi od / slanje (vrijeme Hrvatske; prazno: odmah)
               <input
                 type="datetime-local"
                 value={starts}
@@ -417,7 +433,7 @@ export function PersonalPromotions() {
               />
             </label>
             <label>
-              Vrijedi do (prazno: 30 dana od kreiranja)
+              Vrijedi do (prazno: 30 dana od početka valjanosti)
               <input
                 type="datetime-local"
                 value={expires}
@@ -488,6 +504,10 @@ export function PersonalPromotions() {
             />
           </label>
           <p>
+            E-mail se šalje tek na datum i vrijeme početka valjanosti. Prazno polje „Vrijedi od”
+            znači slanje odmah.
+          </p>
+          <p>
             Oznake: {'{ime}, {kod}, {popust}, {od}, {do}'}. Svaki kod vrijedi samo za pripadajućeg
             korisnika, jednom.
           </p>
@@ -538,7 +558,27 @@ export function PersonalPromotions() {
               {error}
             </p>
           )}
-          {!ready && (
+          {futureStart && health.data?.scheduled_sending_ready === undefined && (
+            <p role="alert">
+              Za zakazano slanje objavite novu verziju funkcija naredbom{' '}
+              <code>npm run deploy:promotions</code>.
+            </p>
+          )}
+          {futureStart && health.data?.scheduled_sending_ready === false && (
+            <p role="alert">
+              Za zakazano slanje primijenite{' '}
+              <a
+                className="text-link"
+                href="/migracije/202610260015_scheduled_promotions.sql"
+                target="_blank"
+                rel="noreferrer"
+              >
+                SQL nadogradnju 015
+              </a>
+              .
+            </p>
+          )}
+          {(!ready || (futureStart && !health.data?.scheduled_sending_ready)) && (
             <Button
               type="button"
               variant="outline"
@@ -548,8 +588,16 @@ export function PersonalPromotions() {
               Provjeri postavke slanja
             </Button>
           )}
-          <Button disabled={busy || imageBusy || !ready}>
-            {busy ? 'Kreiranje i slanje…' : 'Izradi kodove i pošalji e-mail'}
+          <Button
+            disabled={
+              busy || imageBusy || !ready || (futureStart && !health.data?.scheduled_sending_ready)
+            }
+          >
+            {busy
+              ? 'Spremanje promocije…'
+              : starts && fromZonedTime(starts, 'Europe/Zagreb').getTime() > Date.now()
+                ? 'Izradi kodove i zakaži slanje'
+                : 'Izradi kodove i pošalji e-mail'}
           </Button>
         </form>
       </ConfirmationDialog>

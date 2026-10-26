@@ -2,7 +2,7 @@ import { admin, checked } from './http.ts';
 import { normalizeAppUrl } from './app-url.ts';
 import { promotionEmail } from './promotion-email.ts';
 export async function processPromotions(campaign: string | null = null) {
-  const totals = { sent: 0, failed: 0, skipped: 0, claimed: 0, available: true };
+  const totals = { sent: 0, failed: 0, skipped: 0, claimed: 0, deferred: 0, available: true };
   const key = Deno.env.get('RESEND_API_KEY'),
     from = Deno.env.get('EMAIL_FROM'),
     origin = Deno.env.get('APP_URL');
@@ -32,6 +32,26 @@ export async function processPromotions(campaign: string | null = null) {
         db.rpc('promotion_delivery_data', { p_id: claim.id, p_claim: claim.claim_token }),
       );
       if (!job) continue;
+      // Also gate at the last moment before sending. This protects existing
+      // reservations and prevents early delivery during a rolling deployment.
+      if (new Date(job.send_at || job.starts_at).getTime() > Date.now()) {
+        await checked(
+          db
+            .from('promotion_deliveries')
+            .update({
+              status: 'pending',
+              claim_token: null,
+              locked_at: null,
+              attempts: Math.max(0, job.attempts - 1),
+              first_attempt_at: job.attempts <= 1 ? null : job.first_attempt_at,
+            })
+            .eq('id', job.id)
+            .eq('claim_token', claim.claim_token)
+            .eq('status', 'processing'),
+        );
+        totals.deferred++;
+        continue;
+      }
       if (!job.allowed || !job.token) {
         await finish(
           'skipped',

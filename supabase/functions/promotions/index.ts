@@ -37,6 +37,7 @@ serve(async (req) => {
     return json(req, {
       schema_ready: !schema.error,
       worker_ready: (await db.rpc('promotion_worker_ready')).data === true,
+      scheduled_sending_ready: (await db.rpc('promotion_schedule_ready')).data === true,
       email_configured: missing.length === 0,
       missing_email_settings: missing,
     });
@@ -70,6 +71,15 @@ serve(async (req) => {
         { error: 'Slanje e-pošte nije konfigurirano. Promocija nije kreirana.' },
         503,
       );
+    if (body.starts_at && new Date(body.starts_at).getTime() > Date.now()) {
+      const schedule = await db.rpc('promotion_schedule_ready');
+      if (schedule.error || schedule.data !== true)
+        return json(
+          req,
+          { error: 'Za zakazano slanje najprije primijenite SQL nadogradnju 015.' },
+          400,
+        );
+    }
     if (!uuid(body.request_id))
       return json(req, { error: 'Nedostaje identifikator promocije.' }, 400);
     const theme = promotionThemes[body.occasion as PromotionOccasion];
