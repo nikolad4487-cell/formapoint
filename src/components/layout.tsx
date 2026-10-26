@@ -1,4 +1,4 @@
-import { useSiteSettings } from '../hooks/use-site-settings';
+import { useSiteSettings, usePublishedPage } from '../hooks/use-site-settings';
 import { DiscountBanner } from './discount-banner';
 import { SupportCard } from './brand';
 import { useEffect, useRef, useState } from 'react';
@@ -84,6 +84,7 @@ export function PublicHeader() {
   );
 }
 export function PublicFooter() {
+  const provider = usePublishedPage('podaci-pruzatelja');
   const { data: site } = useSiteSettings();
   return (
     <footer className="public-footer">
@@ -111,6 +112,7 @@ export function PublicFooter() {
           <Link to="/kontakt">Kontakt</Link>
           <Link to="/app/podrska">Podrška</Link>
           <Link to="/prigovori">Prigovori</Link>
+          {provider.data && <Link to="/p/podaci-pruzatelja">Podaci o pružatelju</Link>}
           {site?.public_contact_email && (
             <a href={`mailto:${site.public_contact_email}`}>{site.public_contact_email}</a>
           )}

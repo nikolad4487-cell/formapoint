@@ -249,7 +249,7 @@ export function PlatformSettings() {
                 >
                   <h2>Podaci o pružatelju usluga</h2>
                   {[
-                    ['legal_name', 'Naziv tvrtke ili obrta'],
+                    ['legal_name', 'Naziv pružatelja ili ime i prezime'],
                     ['address', 'Adresa'],
                     ['contact_email', 'Poslovni e-mail'],
                     ['tax_status', 'Porezni status'],
@@ -265,8 +265,9 @@ export function PlatformSettings() {
                     </label>
                   ))}
                   <p>
-                    Poslovni podaci su interni. Pravne tekstove pregledajte i odobrite u modulu
-                    Stranice.
+                    Ovdje spremate poslovne podatke. Javni prikaz pružatelja uređuje se na stranici
+                    Podaci o pružatelju u modulu Stranice. Pravne tekstove pregledajte i odobrite u
+                    modulu Stranice.
                   </p>
                   <Button disabled={busy || !expanded}>
                     <Save size={16} />
@@ -365,7 +366,7 @@ export function PlatformSettings() {
                           />
                         </label>
                         <label>
-                          Rok za završnu uplatu (dani)
+                          Rok za drugu uplatu kod modela 50/50 (dani)
                           <input
                             name="final_payment_days"
                             type="number"

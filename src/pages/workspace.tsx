@@ -1,3 +1,4 @@
+import { useSiteSettings, usePublishedPage } from '../hooks/use-site-settings';
 import { WorkPreviewGallery } from '../components/work-preview-gallery';
 import { WorkDeliveryUpload } from '../components/work-delivery-upload';
 import { WorkPreview } from '../components/work-preview';
@@ -759,7 +760,7 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
                 Ugovoreni rok za zahtjev za otkazivanje: {localDate(order.cancellation_deadline_at)}
               </p>
             )}
-            {order.final_payment_due_at && (
+            {order.payment_model === 'split' && order.final_payment_due_at && (
               <p>Ugovoreni rok završne uplate: {localDate(order.final_payment_due_at)}</p>
             )}
             <OrderPayment order={order} admin={admin} />
@@ -1788,6 +1789,10 @@ function SupportConversation({ ticketId, admin }: { ticketId: string; admin: boo
   );
 }
 export function ContactPage() {
+  const site = useSiteSettings();
+  const provider = usePublishedPage('podaci-pruzatelja');
+  const email = site.data?.public_contact_email;
+  const phone = site.data?.contact_phone;
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   return (
@@ -1809,13 +1814,34 @@ export function ContactPage() {
               Zatraži uslugu <ArrowRight size={16} />
             </Link>
           </Button>
-          <div className="notice">
-            <FileText />
-            <p>
-              Kontaktni i poslovni podaci pružatelja još nisu konfigurirani. Pravne stranice sadrže
-              predloške.
-            </p>
-          </div>
+          {email || phone || provider.data ? (
+            <section className="panel contact-provider">
+              <h3>Pružatelj usluge i kontakt</h3>
+              {provider.data && <p className="prose-text">{provider.data.content}</p>}
+              <dl className="checkout-details">
+                {email && (
+                  <div>
+                    <dt>E-mail i pisani prigovori</dt>
+                    <dd>
+                      <a href={`mailto:${email}`}>{email}</a>
+                    </dd>
+                  </div>
+                )}
+                {phone && (
+                  <div>
+                    <dt>Telefon</dt>
+                    <dd>
+                      <a href={`tel:${phone.replace(/[^+\d]/g, '').replace(/^0/, '+385')}`}>
+                        {phone}
+                      </a>
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          ) : (
+            <p>Za pitanja i pisane prigovore možete upotrijebiti kontaktni obrazac.</p>
+          )}
         </div>
         {!configured ? (
           <Unavailable>
