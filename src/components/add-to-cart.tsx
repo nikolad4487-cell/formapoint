@@ -21,7 +21,9 @@ export function AddToCartButton({
   if (service.price_cents === null)
     return (
       <Button asChild variant="outline">
-        <Link to={`/app/nova-narudzba?usluga=${service.slug}&ponuda=1`}>Zatraži ponudu</Link>
+        <Link to={`/app/nova-narudzba?usluga=${encodeURIComponent(service.id)}&ponuda=1`}>
+          Zatraži ponudu
+        </Link>
       </Button>
     );
   return (

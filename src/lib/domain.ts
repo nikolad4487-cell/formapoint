@@ -29,6 +29,7 @@ export const statuses: Record<OrderStatus, string> = {
   cancelled: 'Otkazano',
 };
 export interface Service {
+  category_slug?: string;
   id: string;
   slug: string;
   name: string;

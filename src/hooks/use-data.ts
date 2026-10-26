@@ -9,11 +9,14 @@ export function useServices() {
       if (!db) return catalog;
       const { data, error } = await db
         .from('services')
-        .select('*')
+        .select('*,service_categories(slug)')
         .eq('active', true)
         .order('sort_order');
       if (error) throw error;
-      return data as Service[];
+      return data.map(({ service_categories, ...service }) => ({
+        ...service,
+        category_slug: service_categories?.slug,
+      })) as Service[];
     },
   });
 }

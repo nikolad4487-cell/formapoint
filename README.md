@@ -95,3 +95,5 @@ Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upu
 - Pregled rada prije druge uplate: [upute za objavu i korištenje](docs/KOSARICA-I-PLACANJE.md#pregled-rada-prije-završne-uplate). Objavite `upload` i `download` kroz `npm run deploy:files`; nova SQL migracija nije potrebna.
 
 [Postavljanje AI asistenta](docs/AI-ASISTENT.md) – Gemini ključ i objava funkcije kroz Codespaces.
+
+[Slugovi artikala po kategorijama](docs/SLUGOVI-PO-KATEGORIJAMA.md) – javne putanje `/kategorija/artikl` i SQL nadogradnja 013.

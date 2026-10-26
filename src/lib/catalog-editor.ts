@@ -2,8 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export function catalogError(error: unknown): string {
   const value = error as { code?: string; message?: string };
-  if (value?.code === '23505')
-    return 'Artikl s tom oznakom u URL-u već postoji. Unesite drugu oznaku.';
+  if (value?.code === '23505') {
+    if (value.message?.includes('services_slug_key'))
+      return 'Za jednake oznake u različitim kategorijama primijenite SQL nadogradnju 013.';
+    return 'Artikl s tom oznakom već postoji u odabranoj kategoriji. Odaberite drugu oznaku ili uredite postojeći artikl.';
+  }
   if (value?.code === '42501')
     return 'Nemate ovlasti za spremanje artikla. Prijavite se administratorskim računom.';
   if (value?.code === '23503')
@@ -37,26 +40,7 @@ export async function saveCatalogService(
     if (error) throw error;
     return slug;
   }
-  const category =
-    String(fields.category)
-      .toLowerCase()
-      .replace(/đ/g, 'd')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') || 'artikl';
-  const stem = `${slug}-${category}`;
-  // Existing public URLs stay unchanged. A new article can share an ordinary
-  // label such as "izrada" with another category while getting its own URL.
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const candidate = attempt === 0 ? slug : attempt === 1 ? stem : `${stem}-${attempt}`;
-    const existing = await db.from('services').select('id').eq('slug', candidate).maybeSingle();
-    if (existing.error) throw existing.error;
-    if (existing.data) continue;
-    const { error } = await db.from('services').insert({ ...fields, slug: candidate });
-    if (!error) return candidate;
-    // Handle a simultaneous insert after our uniqueness check as well.
-    if (error.code !== '23505') throw error;
-  }
-  throw new Error('Više artikala već koristi ovu oznaku. Unesite drugačiju oznaku u URL-u.');
+  const { error } = await db.from('services').insert({ ...fields, slug });
+  if (error) throw error;
+  return slug;
 }

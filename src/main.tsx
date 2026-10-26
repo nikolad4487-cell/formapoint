@@ -92,6 +92,7 @@ function App() {
           <Route index element={<HomePage />} />
           <Route path="usluge" element={<ServicesPage />} />
           <Route path="usluge/:slug" element={<ServiceDetail />} />
+          <Route path=":categorySlug/:slug" element={<ServiceDetail />} />
           {[
             'cjenik',
             'kako-funkcionira',

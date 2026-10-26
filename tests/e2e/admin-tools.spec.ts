@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { workspaceFixture, fixtureOrders } from '../fixtures/workspace';
+import { workspaceFixture, fixtureOrders, fixtureServices } from '../fixtures/workspace';
 test.beforeEach(async ({ page }) => workspaceFixture(page, { admin: true }));
 test('postavke spremaju i prazni kontakt bez prepisivanja ostalih odjeljaka', async ({ page }) => {
   await page.goto('/admin/postavke');
@@ -323,7 +323,7 @@ test('brisanje neprazne kategorije prikazuje poruku poslužitelja', async ({ pag
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
-test('novi artikl Prezentacije dobiva jedinstvenu oznaku uz postojeći izrada slug', async ({
+test('novi artikl Prezentacije zadržava izrada slug neovisno o drugoj kategoriji', async ({
   page,
 }) => {
   let saved: Record<string, unknown> | undefined;
@@ -360,13 +360,11 @@ test('novi artikl Prezentacije dobiva jedinstvenu oznaku uz postojeći izrada sl
   await dialog.getByRole('button', { name: 'Spremi uslugu' }).click();
   await expect(dialog).toHaveCount(0);
   expect(saved).toMatchObject({
-    slug: 'izrada-prezentacije',
+    slug: 'izrada',
     category: 'Prezentacije',
     price_cents: 2000,
   });
-  await expect(
-    page.getByText('Artikl je spremljen. Njegova oznaka u URL-u je izrada-prezentacije.'),
-  ).toBeVisible();
+  await expect(page.getByText('Artikl je spremljen.', { exact: true })).toBeVisible();
 });
 
 test('neuspjelo spremanje artikla prikazuje razlog i čuva unesene podatke', async ({ page }) => {
@@ -397,4 +395,52 @@ test('neuspjelo spremanje artikla prikazuje razlog i čuva unesene podatke', asy
   await expect(dialog.getByLabel('Opis', { exact: true })).toHaveValue(
     'Uneseni opis ne smije se izgubiti nakon greške.',
   );
+});
+
+test('javne putanje po kategoriji otvaraju pravi artikl s istom oznakom', async ({ page }) => {
+  const articles = [
+    {
+      ...fixtureServices[0],
+      id: fixtureServices[0].id,
+      name: 'Izrada PowerPoint prezentacije',
+      category: 'Prezentacije',
+      slug: 'izrada',
+      price_cents: 2000,
+      service_categories: { slug: 'prezentacije' },
+    },
+    {
+      ...fixtureServices[1],
+      id: fixtureServices[1].id,
+      name: 'Izrada završnog rada',
+      category: 'Završni rad',
+      slug: 'izrada',
+      price_cents: 6000,
+      service_categories: { slug: 'zavrsni-rad' },
+    },
+  ];
+  await page.route('**/rest/v1/services?*', (route) => route.fulfill({ json: articles }));
+  const added: string[] = [];
+  await page.route('**/rest/v1/rpc/cart_add', async (route) => {
+    added.push(route.request().postDataJSON().p_service);
+    await route.fulfill({ json: null });
+  });
+  await page.goto('/prezentacije/izrada');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+    'Izrada PowerPoint prezentacije',
+  );
+  await page.getByRole('button', { name: 'Dodaj u košaricu' }).click();
+  await expect.poll(() => added.length).toBe(1);
+  await page.goto('/zavrsni-rad/izrada');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Izrada završnog rada');
+  await page.getByRole('button', { name: 'Dodaj u košaricu' }).click();
+  await expect.poll(() => added.length).toBe(2);
+  expect(added).toEqual(articles.map((a) => a.id));
+  await page.goto('/usluge/izrada');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Odaberite kategoriju artikla');
+  await expect(
+    page.getByRole('link', { name: 'Saznaj više: Izrada PowerPoint prezentacije' }),
+  ).toHaveAttribute('href', '/prezentacije/izrada');
+  await expect(
+    page.getByRole('link', { name: 'Saznaj više: Izrada završnog rada' }),
+  ).toHaveAttribute('href', '/zavrsni-rad/izrada');
 });

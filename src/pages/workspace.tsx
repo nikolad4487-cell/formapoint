@@ -1,3 +1,4 @@
+import { serviceReference } from '../lib/service-links';
 import { saveCatalogService, catalogError } from '../lib/catalog-editor';
 import { useSiteSettings, usePublishedPage } from '../hooks/use-site-settings';
 import { WorkPreviewGallery } from '../components/work-preview-gallery';
@@ -401,7 +402,7 @@ export function NewOrderPage() {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   const cache = useQueryClient();
-  const s = services.data?.find((x) => x.slug === draft.service);
+  const s = serviceReference(services.data || [], draft.service);
   const total = s?.price_cents == null ? null : s.price_cents * draft.quantity;
   useEffect(() => {
     sessionStorage.setItem(key, JSON.stringify(draft));
@@ -490,7 +491,7 @@ export function NewOrderPage() {
                   <button
                     key={x.id}
                     onClick={() =>
-                      setDraft({ ...draft, service: x.slug, model: 'full', quantity: 1 })
+                      setDraft({ ...draft, service: x.id, model: 'full', quantity: 1 })
                     }
                     className={`select-card ${s?.id === x.id ? 'selected' : ''}`}
                   >
@@ -2005,7 +2006,7 @@ export function ServiceEditor({
       </label>
       {!service && (
         <small id="service-slug-help">
-          Ako je oznaka zauzeta, automatski se dodaje naziv kategorije.
+          Oznaka mora biti jedinstvena samo unutar odabrane kategorije.
         </small>
       )}
       <label>
@@ -2090,6 +2091,16 @@ export function ServiceEditor({
         <p role="alert" className="field-error">
           {formError}
         </p>
+      )}
+      {formError.includes('013') && (
+        <a
+          className="text-link"
+          href="/migracije/202610260013_category_service_slugs.sql"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Otvori SQL nadogradnju 013
+        </a>
       )}
       {categories.isError && (
         <p role="alert">

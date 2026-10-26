@@ -1,10 +1,11 @@
+import { categorySlug, servicePath } from '../lib/service-links';
 import { AddToCartButton } from '../components/add-to-cart';
 import { usePublishedPage } from '../hooks/use-site-settings';
 import { PublishedText } from './content';
 import { WorkspaceIllustration, BrandBenefit } from '../components/brand';
 import { PaymentMethods } from '../components/payment-methods';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import {
   ArrowRight,
   Check,
@@ -350,12 +351,30 @@ export function ServicesPage() {
   );
 }
 export function ServiceDetail() {
-  const { slug } = useParams();
+  const { slug, categorySlug: category } = useParams();
   const q = useServices();
   if (q.isPending) return <LoadingSkeleton />;
   if (q.isError) return <ErrorState retry={() => void q.refetch()} />;
-  const s = q.data?.find((x) => x.slug === slug);
-  if (!s) return <NotFound />;
+  const matches = (q.data || []).filter(
+    (service) => service.slug === slug && (!category || categorySlug(service) === category),
+  );
+  if (!matches.length) return <NotFound />;
+  if (!category && matches.length > 1)
+    return (
+      <div className="container section">
+        <PageHeader
+          title="Odaberite kategoriju artikla"
+          description="Ova oznaka postoji u više kategorija."
+        />
+        <div className="service-grid">
+          {matches.map((service) => (
+            <ServiceCard key={service.id} service={service} />
+          ))}
+        </div>
+      </div>
+    );
+  const s = matches[0];
+  if (!category) return <Navigate to={servicePath(s)} replace />;
   return (
     <div className="container section">
       <Breadcrumbs current={s.name} />

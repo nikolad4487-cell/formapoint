@@ -1,3 +1,4 @@
+import { serviceReference } from '../lib/service-links';
 import { usePublicPaymentMethods } from '../hooks/use-payment-methods';
 import { AddToCartButton } from '../components/add-to-cart';
 import { useEffect, useState } from 'react';
@@ -44,7 +45,7 @@ export function CatalogOrderPage() {
   const q = useServices();
   const [params] = useSearchParams();
   const [search, setSearch] = useState('');
-  const service = q.data?.find((s) => s.slug === params.get('usluga'));
+  const service = serviceReference(q.data || [], params.get('usluga'));
   if (params.get('ponuda') === '1' && service?.price_cents === null) return <NewOrderPage />;
   return (
     <>
