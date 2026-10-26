@@ -44,7 +44,7 @@ import {
 import './index.css';
 import './reference.css';
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 15000, retry: 1, refetchOnWindowFocus: true } },
+  defaultOptions: { queries: { staleTime: 15000, retry: 1, refetchOnWindowFocus: false } },
 });
 function NavigationEffects() {
   const { pathname } = useLocation();

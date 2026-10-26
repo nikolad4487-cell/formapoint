@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { db } from '../lib/supabase';
@@ -12,7 +12,6 @@ const AuthContext = createContext<{
 }>({ session: null, role: 'CUSTOMER', loading: true, error: null });
 export function AuthProvider({ children }: { children: ReactNode }) {
   const cache = useQueryClient();
-  const currentUser = useRef<string | null | undefined>(undefined);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<Role>('CUSTOMER');
   const [loading, setLoading] = useState(Boolean(db));
@@ -21,16 +20,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!db) return;
     let alive = true;
     let revision = 0;
+    // Keep this local to the subscription lifetime so StrictMode's new effect
+    // still completes its own initial permission check.
+    let currentUser: string | null | undefined;
+
     async function apply(next: Session | null) {
-      const current = ++revision;
-      if (currentUser.current !== (next?.user.id ?? null)) {
-        // Initial public queries already use the current session. On account changes,
-        // reset active observers so they refetch instead of leaving them detached.
-        if (currentUser.current !== undefined) void cache.resetQueries();
-        if (currentUser.current) sessionStorage.removeItem(`fp-draft:${currentUser.current}`);
-        currentUser.current = next?.user.id ?? null;
-      }
+      const nextUser = next?.user.id ?? null;
       setSession(next);
+      // Supabase emits SIGNED_IN again on tab focus and TOKEN_REFRESHED when
+      // renewing credentials. Neither changes the owner of the mounted forms.
+      // Do not reset permissions/loading, cancel the initial check, or clear
+      // queries unless the actual account changes.
+      if (currentUser === nextUser) return;
+      const current = ++revision;
+      if (currentUser !== undefined) void cache.resetQueries();
+      if (currentUser) sessionStorage.removeItem(`fp-draft:${currentUser}`);
+      currentUser = nextUser;
       setRole('CUSTOMER');
       setError(null);
       if (next) {
