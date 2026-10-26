@@ -23,3 +23,6 @@ verify_jwt = false
 verify_jwt = false
 [functions.portfolio-download]
 verify_jwt = false
+
+[functions.ai-assistant]
+verify_jwt = false

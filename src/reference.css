@@ -3322,41 +3322,6 @@ body {
     height: 190px;
   }
 }
-.help-toggle {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  z-index: 35;
-  border: 0;
-  border-radius: 40px;
-  background: #3155f6;
-  color: #fff;
-  box-shadow: 0 7px 25px #3155f640;
-  padding: 13px 17px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  cursor: pointer;
-  font: inherit;
-  font-size: 13px;
-}
-.help-links {
-  display: grid;
-  gap: 12px;
-}
-.help-links a {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px;
-  border: 1px solid #e2e7f3;
-  border-radius: 12px;
-  color: #3155f6;
-}
-.help-toggle:focus-visible {
-  outline: 3px solid #7d94ff;
-  outline-offset: 4px;
-}
 
 .admin-extra-stats .brand-shortcut {
   grid-column: span 2;

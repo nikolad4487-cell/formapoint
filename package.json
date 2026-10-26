@@ -12,13 +12,14 @@
     "typecheck": "tsc -b",
     "db:test": "node scripts/test-database.mjs",
     "format": "prettier --write src tests scripts *.ts *.json *.html docs README.md",
-    "check:edge": "deno check --node-modules-dir=none --no-config --lock=supabase/functions/deno.lock --frozen supabase/functions/checkout/index.ts supabase/functions/stripe-webhook/index.ts supabase/functions/download/index.ts supabase/functions/upload/index.ts supabase/functions/contact/index.ts supabase/functions/notify/index.ts supabase/functions/admin-tools/index.ts supabase/functions/portfolio-download/index.ts",
+    "check:edge": "deno check --node-modules-dir=none --no-config --lock=supabase/functions/deno.lock --frozen supabase/functions/checkout/index.ts supabase/functions/stripe-webhook/index.ts supabase/functions/download/index.ts supabase/functions/upload/index.ts supabase/functions/contact/index.ts supabase/functions/notify/index.ts supabase/functions/admin-tools/index.ts supabase/functions/portfolio-download/index.ts supabase/functions/ai-assistant/index.ts",
     "backend:start": "bash scripts/start-local.sh",
     "backend:functions": "/workspace/.tools/formapoint/supabase functions serve --env-file .env.edge.local",
     "test:local": "node scripts/test-local.mjs",
     "test:edge": "deno test --allow-env --node-modules-dir=none --no-config --lock=supabase/functions/deno.lock --frozen supabase/functions/_tests",
     "deploy:files": "node scripts/deploy-files.mjs",
-    "deploy:stripe": "node scripts/deploy-stripe.mjs"
+    "deploy:stripe": "node scripts/deploy-stripe.mjs",
+    "deploy:ai": "node scripts/deploy-ai.mjs"
   },
   "engines": {
     "node": ">=22.12"

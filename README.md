@@ -93,3 +93,5 @@ Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upu
 - [Košarica, završetak narudžbe i IBAN/Stripe plaćanja](docs/KOSARICA-I-PLACANJE.md) — SQL nadogradnja 010 nakon 006–009.
 - IBAN kartica i prethodno učitana ikona povezuju se s bankovnom uplatom kroz [SQL nadogradnju 011](public/migracije/202610250011_bank_method.sql), nakon 010.
 - Pregled rada prije druge uplate: [upute za objavu i korištenje](docs/KOSARICA-I-PLACANJE.md#pregled-rada-prije-završne-uplate). Objavite `upload` i `download` kroz `npm run deploy:files`; nova SQL migracija nije potrebna.
+
+[Postavljanje AI asistenta](docs/AI-ASISTENT.md) – Gemini ključ i objava funkcije kroz Codespaces.

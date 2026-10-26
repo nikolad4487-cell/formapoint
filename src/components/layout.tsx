@@ -1,4 +1,3 @@
-import { HelpPanel } from './help-panel';
 import { useSiteSettings } from '../hooks/use-site-settings';
 import { DiscountBanner } from './discount-banner';
 import { SupportCard } from './brand';
@@ -166,7 +165,6 @@ export function AppShell() {
         <Outlet />
       </main>
       <PublicFooter />
-      <HelpPanel />
     </div>
   );
 }

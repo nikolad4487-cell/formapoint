@@ -1,3 +1,4 @@
+import { AIAssistant } from './components/ai-assistant';
 import { GuestPage } from './pages/guest';
 import { CartPage, CatalogOrderPage } from './pages/cart';
 import { ContactInquiries } from './pages/admin/inquiries';
@@ -178,6 +179,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <BrowserRouter>
             <App />
+            <AIAssistant />
           </BrowserRouter>
           <Toaster position="bottom-right" richColors closeButton />
         </AuthProvider>

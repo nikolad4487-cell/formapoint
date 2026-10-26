@@ -41,7 +41,7 @@ if (process.argv.includes('--dist')) {
     .filter((p) => p.endsWith('.js'))
     .map((p) => readFileSync(`dist/assets/${p}`, 'utf8'))
     .join('\n');
-  for (const name of ['SUPABASE_SERVICE_ROLE_KEY', 'FORMAPOINT_ADMIN_PASSWORD']) {
+  for (const name of ['SUPABASE_SERVICE_ROLE_KEY', 'FORMAPOINT_ADMIN_PASSWORD', 'GEMINI_API_KEY']) {
     const value = process.env[name];
     if (value && value.length >= 12 && text.includes(value))
       throw new Error(
