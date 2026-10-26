@@ -27,6 +27,16 @@ interface Campaign {
   starts_at: string;
   expires_at: string;
 }
+interface BirthdaySettings {
+  name: string;
+  kind: string;
+  value: number;
+  validity_days: number;
+  subject: string;
+  message: string;
+  image_url: string;
+  active: boolean;
+}
 interface Delivery {
   id: string;
   recipient_name: string;
@@ -64,11 +74,28 @@ export function PersonalPromotions() {
         schema_ready: boolean;
         worker_ready?: boolean;
         scheduled_sending_ready?: boolean;
+        birthday_ready?: boolean;
         email_configured: boolean;
         missing_email_settings?: string[];
       }>,
     retry: false,
   });
+  const birthday = useQuery({
+    queryKey: ['birthday-promotion-settings'],
+    enabled: health.data?.birthday_ready === true,
+    queryFn: async () => {
+      const { data, error } = await requireDb()
+        .from('birthday_promotion_settings')
+        .select('*')
+        .eq('id', true)
+        .maybeSingle();
+      if (error) throw error;
+      return data as BirthdaySettings | null;
+    },
+  });
+  const [name, setName] = useState('');
+  const [days, setDays] = useState('30');
+  const [birthdayActive, setBirthdayActive] = useState(true);
   const [open, setOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -106,10 +133,15 @@ export function PersonalPromotions() {
     },
   });
   const ready = health.data?.schema_ready && health.data.email_configured;
-  const futureStart = !!starts && fromZonedTime(starts, 'Europe/Zagreb').getTime() > Date.now();
+  const isBirthday = occasion === 'birthday';
+  const futureStart =
+    !isBirthday && !!starts && fromZonedTime(starts, 'Europe/Zagreb').getTime() > Date.now();
   const defaultImage = () =>
     new URL(promotionThemes[occasion].image, window.location.origin).toString();
   function fresh() {
+    setName('');
+    setDays('30');
+    setBirthdayActive(true);
     setRequestId(crypto.randomUUID());
     setError('');
     setOccasion('christmas');
@@ -127,6 +159,7 @@ export function PersonalPromotions() {
   }
   async function refresh() {
     await cache.invalidateQueries({ queryKey: ['personal-promotions'] });
+    await cache.invalidateQueries({ queryKey: ['birthday-promotion-settings'] });
     await cache.invalidateQueries({ queryKey: ['promo_codes'] });
   }
   async function drain(id: string, retry = false) {
@@ -159,14 +192,19 @@ export function PersonalPromotions() {
               return 1000;
             }
           })(),
-    starts_at: starts
-      ? fromZonedTime(starts, 'Europe/Zagreb').toISOString()
-      : new Date().toISOString(),
-    expires_at: expires
-      ? fromZonedTime(expires, 'Europe/Zagreb').toISOString()
-      : new Date(
-          (starts ? fromZonedTime(starts, 'Europe/Zagreb').getTime() : Date.now()) + 30 * 86400000,
-        ).toISOString(),
+    starts_at:
+      !isBirthday && starts
+        ? fromZonedTime(starts, 'Europe/Zagreb').toISOString()
+        : new Date().toISOString(),
+    expires_at:
+      !isBirthday && expires
+        ? fromZonedTime(expires, 'Europe/Zagreb').toISOString()
+        : new Date(
+            (!isBirthday && starts
+              ? fromZonedTime(starts, 'Europe/Zagreb').getTime()
+              : Date.now()) +
+              (isBirthday ? Number(days) || 30 : 30) * 86400000,
+          ).toISOString(),
     subject,
     message,
     image_url: image || defaultImage(),
@@ -287,6 +325,53 @@ export function PersonalPromotions() {
           uključite worker prema uputama za promocije.
         </p>
       )}
+      <article className="panel" style={{ marginBottom: 24 }}>
+        <div className="panel-heading">
+          <div>
+            <h3>Automatski rođendanski poklon</h3>
+            <p>
+              {birthday.data
+                ? `${birthday.data.active ? 'Uključeno' : 'Isključeno'} · ${birthday.data.kind === 'percent' ? `${birthday.data.value} %` : `${(birthday.data.value / 100).toFixed(2)} €`} · kod vrijedi ${birthday.data.validity_days} dana od rođendana.`
+                : 'Postavite popust jednom. Svaki korisnik dobiva svoj kod na svoj rođendan.'}
+            </p>
+            <p>
+              Dan i mjesec korisnik unosi u Moj profil. Slanje se ponavlja svake godine, uz privolu
+              za promotivne poruke.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            disabled={busy || birthday.isFetching}
+            onClick={() => {
+              fresh();
+              setOccasion('birthday');
+              setName(birthday.data?.name || 'Rođendanski poklon');
+              setSubject(birthday.data?.subject || promotionThemes.birthday.subject);
+              setMessage(birthday.data?.message || promotionThemes.birthday.message);
+              if (birthday.data) {
+                setKind(birthday.data.kind);
+                setValue(
+                  String(
+                    birthday.data.kind === 'percent'
+                      ? birthday.data.value
+                      : birthday.data.value / 100,
+                  ),
+                );
+                setImage(birthday.data.image_url);
+                setDays(String(birthday.data.validity_days));
+                setBirthdayActive(birthday.data.active);
+              }
+            }}
+          >
+            Postavke rođendanske promocije
+          </Button>
+        </div>
+        {birthday.isError && (
+          <p role="alert">
+            Postavke rođendanske promocije nije moguće učitati. Osvježite stranicu.
+          </p>
+        )}
+      </article>
       {campaigns.data?.map((c) => (
         <article key={c.id} className="file-row">
           <div>
@@ -338,35 +423,43 @@ export function PersonalPromotions() {
             event.preventDefault();
             setBusy(true);
             setError('');
-            const data = new FormData(event.currentTarget);
             try {
-              if (audience === 'selected' && !selected.length)
+              if (!isBirthday && audience === 'selected' && !selected.length)
                 throw new Error('Odaberite barem jednog korisnika.');
               const amount = kind === 'fixed' ? eurosToCents(value, 1) : Number(value);
               if (!Number.isInteger(amount) || amount < 1 || (kind === 'percent' && amount > 100))
                 throw new Error('Unesite valjanu vrijednost popusta.');
               const result = await callPromotion({
-                action: 'create',
+                action: isBirthday ? 'birthday-save' : 'create',
                 request_id: requestId,
-                name: String(data.get('name')).trim(),
+                name: name.trim(),
+                ...(isBirthday ? { validity_days: Number(days), active: birthdayActive } : {}),
                 occasion,
                 kind,
                 value: amount,
                 subject,
                 message,
                 image_url: image || null,
-                user_ids: audience === 'selected' ? selected : null,
-                starts_at: starts ? fromZonedTime(starts, 'Europe/Zagreb').toISOString() : null,
-                expires_at: expires ? fromZonedTime(expires, 'Europe/Zagreb').toISOString() : null,
+                user_ids: !isBirthday && audience === 'selected' ? selected : null,
+                starts_at:
+                  !isBirthday && starts
+                    ? fromZonedTime(starts, 'Europe/Zagreb').toISOString()
+                    : null,
+                expires_at:
+                  !isBirthday && expires
+                    ? fromZonedTime(expires, 'Europe/Zagreb').toISOString()
+                    : null,
               });
               setOpen(false);
               await refresh();
               toast.success(
-                starts && fromZonedTime(starts, 'Europe/Zagreb').getTime() > Date.now()
-                  ? 'Osobni kodovi su kreirani. E-mailovi su zakazani za početak valjanosti.'
-                  : 'Osobni kodovi su kreirani. Status slanja prikazan je uz promociju.',
+                isBirthday
+                  ? 'Rođendanska promocija je spremljena. Kodovi se šalju na rođendan svakog korisnika.'
+                  : futureStart
+                    ? 'Osobni kodovi su kreirani. E-mailovi su zakazani za početak valjanosti.'
+                    : 'Osobni kodovi su kreirani. Status slanja prikazan je uz promociju.',
               );
-              await drain(result.campaign_id);
+              if (!isBirthday) await drain(result.campaign_id);
             } catch (e) {
               const message = e instanceof Error ? e.message : 'Promocija nije obrađena.';
               setError(message);
@@ -378,7 +471,14 @@ export function PersonalPromotions() {
         >
           <label>
             Naziv promocije
-            <input name="name" required minLength={2} maxLength={150} />
+            <input
+              name="name"
+              required
+              minLength={2}
+              maxLength={150}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
           </label>
           <label>
             Prigoda
@@ -391,6 +491,22 @@ export function PersonalPromotions() {
                 setSubject(promotionThemes[next].subject);
                 setMessage(promotionThemes[next].message);
                 setImage('');
+                if (next === 'birthday' && birthday.data) {
+                  setName(birthday.data.name);
+                  setKind(birthday.data.kind);
+                  setValue(
+                    String(
+                      birthday.data.kind === 'percent'
+                        ? birthday.data.value
+                        : birthday.data.value / 100,
+                    ),
+                  );
+                  setSubject(birthday.data.subject);
+                  setMessage(birthday.data.message);
+                  setImage(birthday.data.image_url);
+                  setDays(String(birthday.data.validity_days));
+                  setBirthdayActive(birthday.data.active);
+                }
               }}
             >
               {Object.entries(promotionThemes).map(([key, theme]) => (
@@ -423,65 +539,100 @@ export function PersonalPromotions() {
               />
             </label>
           </div>
-          <div className="form-row">
-            <label>
-              Vrijedi od / slanje (vrijeme Hrvatske; prazno: odmah)
-              <input
-                type="datetime-local"
-                value={starts}
-                onChange={(event) => setStarts(event.target.value)}
-              />
-            </label>
-            <label>
-              Vrijedi do (prazno: 30 dana od početka valjanosti)
-              <input
-                type="datetime-local"
-                value={expires}
-                onChange={(event) => setExpires(event.target.value)}
-              />
-            </label>
-          </div>
-          <label>
-            Primatelji
-            <select
-              aria-label="Primatelji"
-              value={audience}
-              onChange={(event) => setAudience(event.target.value)}
-            >
-              <option value="all">Svi korisnici — svakome poseban kod</option>
-              <option value="selected">Odabrani korisnici</option>
-            </select>
-          </label>
-          {audience === 'selected' && (
+          {isBirthday ? (
             <>
+              <p>
+                Šalje se automatski na rođendan svakog korisnika, prema danu i mjesecu iz profila.
+                Ne postavljaju se zajednički datumi niti popis primatelja.
+              </p>
               <label>
-                Pretraži korisnike
-                <input value={search} onChange={(event) => setSearch(event.target.value)} />
+                Valjanost rođendanskog koda (dana)
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  required
+                  value={days}
+                  onChange={(event) => setDays(event.target.value)}
+                />
               </label>
-              <div style={{ maxHeight: 190, overflowY: 'auto' }}>
-                {users.data?.map((user) => (
-                  <label key={user.id} className="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(user.id)}
-                      onChange={(event) =>
-                        setSelected((current) =>
-                          event.target.checked
-                            ? [...current, user.id]
-                            : current.filter((id) => id !== user.id),
-                        )
-                      }
-                    />
-                    {user.first_name} {user.last_name} · {user.email}
-                  </label>
-                ))}
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={birthdayActive}
+                  onChange={(event) => setBirthdayActive(event.target.checked)}
+                />
+                Uključi godišnje rođendanske poruke
+              </label>
+              <p>
+                Jedan osobni kod godišnje. Za 29. veljače slanje je 28. veljače u godinama bez tog
+                datuma.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="form-row">
+                <label>
+                  Vrijedi od / slanje (vrijeme Hrvatske; prazno: odmah)
+                  <input
+                    type="datetime-local"
+                    value={starts}
+                    onChange={(event) => setStarts(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Vrijedi do (prazno: 30 dana od početka valjanosti)
+                  <input
+                    type="datetime-local"
+                    value={expires}
+                    onChange={(event) => setExpires(event.target.value)}
+                  />
+                </label>
               </div>
-              <small>Odabrano: {selected.length}</small>
+              <label>
+                Primatelji
+                <select
+                  aria-label="Primatelji"
+                  value={audience}
+                  onChange={(event) => setAudience(event.target.value)}
+                >
+                  <option value="all">Svi korisnici — svakome poseban kod</option>
+                  <option value="selected">Odabrani korisnici</option>
+                </select>
+              </label>
+              {audience === 'selected' && (
+                <>
+                  <label>
+                    Pretraži korisnike
+                    <input value={search} onChange={(event) => setSearch(event.target.value)} />
+                  </label>
+                  <div style={{ maxHeight: 190, overflowY: 'auto' }}>
+                    {users.data?.map((user) => (
+                      <label key={user.id} className="checkbox">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(user.id)}
+                          onChange={(event) =>
+                            setSelected((current) =>
+                              event.target.checked
+                                ? [...current, user.id]
+                                : current.filter((id) => id !== user.id),
+                            )
+                          }
+                        />
+                        {user.first_name} {user.last_name} · {user.email}
+                      </label>
+                    ))}
+                  </div>
+                  <small>Odabrano: {selected.length}</small>
+                </>
+              )}
             </>
           )}
           <p>
             Poruke primaju korisnici koji imaju uključene promotivne poruke i potvrđen e-mail. Za
-            ostale se kod kreira, a slanje označava kao preskočeno.
+            ostale se obična promocija označava kao preskočena; rođendanski kod izrađuje se tek kada
+            su uvjeti ispunjeni na dan rođendana.
           </p>
           <label>
             Naslov e-maila
@@ -504,8 +655,9 @@ export function PersonalPromotions() {
             />
           </label>
           <p>
-            E-mail se šalje tek na datum i vrijeme početka valjanosti. Prazno polje „Vrijedi od”
-            znači slanje odmah.
+            {isBirthday
+              ? 'Kod vrijedi od rođendana, a e-mail stiže toga dana. Pregled ispod koristi primjer datuma.'
+              : 'E-mail se šalje tek na datum i vrijeme početka valjanosti. Prazno polje „Vrijedi od” znači slanje odmah.'}
           </p>
           <p>
             Oznake: {'{ime}, {kod}, {popust}, {od}, {do}'}. Svaki kod vrijedi samo za pripadajućeg
@@ -558,6 +710,25 @@ export function PersonalPromotions() {
               {error}
             </p>
           )}
+          {isBirthday && !health.data?.birthday_ready && (
+            <p role="alert">
+              Za automatske rođendane primijenite{' '}
+              <a
+                className="text-link"
+                href="/migracije/202610260016_birthday_promotions.sql"
+                target="_blank"
+                rel="noreferrer"
+              >
+                SQL nadogradnju 016
+              </a>{' '}
+              nakon 015 i objavite funkcije naredbom <code>npm run deploy:promotions</code>.
+            </p>
+          )}
+          {isBirthday && !health.data?.worker_ready && (
+            <p role="alert">
+              Za automatske rođendane mora biti uključena pozadinska obrada promocija.
+            </p>
+          )}
           {futureStart && health.data?.scheduled_sending_ready === undefined && (
             <p role="alert">
               Za zakazano slanje objavite novu verziju funkcija naredbom{' '}
@@ -578,7 +749,9 @@ export function PersonalPromotions() {
               .
             </p>
           )}
-          {(!ready || (futureStart && !health.data?.scheduled_sending_ready)) && (
+          {(!ready ||
+            (isBirthday && (!health.data?.birthday_ready || !health.data?.worker_ready)) ||
+            (futureStart && !health.data?.scheduled_sending_ready)) && (
             <Button
               type="button"
               variant="outline"
@@ -590,14 +763,24 @@ export function PersonalPromotions() {
           )}
           <Button
             disabled={
-              busy || imageBusy || !ready || (futureStart && !health.data?.scheduled_sending_ready)
+              busy ||
+              imageBusy ||
+              !ready ||
+              (isBirthday &&
+                (!health.data?.birthday_ready ||
+                  !health.data?.worker_ready ||
+                  birthday.isError ||
+                  birthday.isFetching)) ||
+              (futureStart && !health.data?.scheduled_sending_ready)
             }
           >
             {busy
               ? 'Spremanje promocije…'
-              : starts && fromZonedTime(starts, 'Europe/Zagreb').getTime() > Date.now()
-                ? 'Izradi kodove i zakaži slanje'
-                : 'Izradi kodove i pošalji e-mail'}
+              : isBirthday
+                ? 'Spremi automatsku rođendansku promociju'
+                : futureStart
+                  ? 'Izradi kodove i zakaži slanje'
+                  : 'Izradi kodove i pošalji e-mail'}
           </Button>
         </form>
       </ConfirmationDialog>

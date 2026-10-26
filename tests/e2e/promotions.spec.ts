@@ -12,8 +12,8 @@ test('prigodna promocija personalizira pregled i šalje odabranom korisniku s au
         ? [
             {
               id: 'd8000000-0000-4000-8000-000000000001',
-              name: 'Rođendanski poklon',
-              occasion: 'birthday',
+              name: 'Uskrsni poklon',
+              occasion: 'easter',
               recipients: 1,
               sent: 1,
               pending: 0,
@@ -51,27 +51,27 @@ test('prigodna promocija personalizira pregled i šalje odabranom korisniku s au
   await page.goto('/admin/kuponi');
   await page.getByRole('button', { name: 'Nova promocija', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Nova personalizirana promocija' });
-  await dialog.getByLabel('Naziv promocije', { exact: true }).fill('Rođendanski poklon');
-  await dialog.getByRole('combobox', { name: 'Prigoda', exact: true }).selectOption('birthday');
+  await dialog.getByLabel('Naziv promocije', { exact: true }).fill('Uskrsni poklon');
+  await dialog.getByRole('combobox', { name: 'Prigoda', exact: true }).selectOption('easter');
   await expect(dialog.getByLabel('Naslov e-maila')).toHaveValue(
-    'Sretan rođendan, {ime}! Tvoj FormaPoint poklon',
+    '{ime}, uskrsni poklon od FormaPointa',
   );
-  await expect(dialog.locator('img')).toHaveAttribute('src', '/promotions/birthday.jpg');
+  await expect(dialog.locator('img')).toHaveAttribute('src', '/promotions/easter.jpg');
   await dialog.getByLabel('Vrijednost (%)').fill('15');
   await dialog.getByRole('combobox', { name: 'Primatelji', exact: true }).selectOption('selected');
   await dialog.getByRole('checkbox').first().check();
   await dialog
     .getByLabel('Personalizirana poruka')
-    .fill('Pozdrav {ime}, tvoj rođendanski poklon je {popust}. Iskoristi {kod} do {do}.');
+    .fill('Pozdrav {ime}, tvoj uskrsni poklon je {popust}. Iskoristi {kod} do {do}.');
   await dialog.locator('summary').click();
   const preview = dialog.frameLocator('iframe[title="Pregled promotivnog e-maila"]');
-  await expect(preview.getByText('RODJENDAN-PRIMJER', { exact: true })).toBeVisible();
+  await expect(preview.getByText('USKRS-PRIMJER', { exact: true })).toBeVisible();
   await expect(preview.locator('body')).toContainText('15 %');
   await page.screenshot({ path: `/tmp/formapoint-promotions-${testInfo.project.name}.png` });
   await dialog.getByRole('button', { name: 'Izradi kodove i pošalji e-mail', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   expect(body).toMatchObject({
-    occasion: 'birthday',
+    occasion: 'easter',
     value: 15,
     kind: 'percent',
     user_ids: [fixtureUser],
@@ -190,4 +190,108 @@ test.describe('Zakazivanje prema vremenu Hrvatske', () => {
       page.getByText('1 kodova · 0 poslano · 1 čeka · 0 neuspjelo · 0 preskočeno'),
     ).toBeVisible();
   });
+});
+
+test('rođendani imaju godišnje pravilo bez zajedničkih datuma i odabira primatelja', async ({
+  page,
+}) => {
+  await workspaceFixture(page, { admin: true });
+  let saved: any;
+  await page.route('**/rest/v1/rpc/personal_promotion_summary', (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.route('**/rest/v1/birthday_promotion_settings**', (route) =>
+    route.fulfill({
+      json: saved
+        ? {
+            name: saved.name,
+            kind: saved.kind,
+            value: saved.value,
+            validity_days: saved.validity_days,
+            subject: saved.subject,
+            message: saved.message,
+            image_url: 'https://example.invalid/birthday.jpg',
+            active: saved.active,
+          }
+        : null,
+    }),
+  );
+  await page.route('**/functions/v1/promotions', (route) => {
+    const body = route.request().postDataJSON();
+    if (body.action === 'health')
+      return route.fulfill({
+        json: {
+          schema_ready: true,
+          email_configured: true,
+          worker_ready: true,
+          birthday_ready: true,
+        },
+      });
+    expect(body.action).toBe('birthday-save');
+    saved = body;
+    return route.fulfill({ json: { saved: true } });
+  });
+  await page.goto('/admin/kuponi');
+  await page.getByRole('button', { name: 'Postavke rođendanske promocije' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel(/Vrijedi od/)).toHaveCount(0);
+  await expect(dialog.getByLabel(/Vrijedi do/)).toHaveCount(0);
+  await expect(dialog.getByRole('combobox', { name: 'Primatelji' })).toHaveCount(0);
+  await expect(dialog.getByLabel('Valjanost rođendanskog koda (dana)')).toHaveValue('30');
+  await expect(dialog.getByLabel('Uključi godišnje rođendanske poruke')).toBeChecked();
+  await dialog.getByLabel('Vrijednost (%)').fill('20');
+  await dialog.getByRole('button', { name: 'Spremi automatsku rođendansku promociju' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(saved).toMatchObject({
+    action: 'birthday-save',
+    occasion: 'birthday',
+    value: 20,
+    validity_days: 30,
+    active: true,
+    starts_at: null,
+    expires_at: null,
+    user_ids: null,
+  });
+  await expect(
+    page.getByText('Uključeno · 20 % · kod vrijedi 30 dana od rođendana.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Postavke rođendanske promocije' }).click();
+  await expect(dialog.getByLabel('Vrijednost (%)')).toHaveValue('20');
+  await dialog.getByLabel('Uključi godišnje rođendanske poruke').uncheck();
+  await dialog.getByRole('button', { name: 'Spremi automatsku rođendansku promociju' }).click();
+  await expect(
+    page.getByText('Isključeno · 20 % · kod vrijedi 30 dana od rođendana.'),
+  ).toBeVisible();
+});
+
+test('korisnik sprema i uklanja dan i mjesec rođenja u profilu', async ({ page }) => {
+  await workspaceFixture(page);
+  let profile = {
+    id: fixtureUser,
+    first_name: 'Test',
+    last_name: 'Korisnik',
+    phone: '',
+    marketing_consent: false,
+    birthday_day: null as number | null,
+    birthday_month: null as number | null,
+  };
+  await page.route('**/rest/v1/profiles**', async (route) => {
+    if (route.request().method() === 'PATCH')
+      profile = { ...profile, ...route.request().postDataJSON() };
+    await route.fulfill({ json: [profile] });
+  });
+  await page.goto('/app/profil');
+  await page.getByLabel('Dan rođenja').selectOption('29');
+  await page.getByLabel('Mjesec rođenja').selectOption('2');
+  await page.getByRole('button', { name: 'Spremi profil', exact: true }).click();
+  await expect.poll(() => profile.birthday_day).toBe(29);
+  expect(profile.birthday_month).toBe(2);
+  expect(profile.marketing_consent).toBe(false);
+  await page.reload();
+  await expect(page.getByLabel('Dan rođenja')).toHaveValue('29');
+  await page.getByLabel('Dan rođenja').selectOption('');
+  await page.getByLabel('Mjesec rođenja').selectOption('');
+  await page.getByRole('button', { name: 'Spremi profil', exact: true }).click();
+  await expect.poll(() => profile.birthday_day).toBeNull();
+  expect(profile.birthday_month).toBeNull();
 });

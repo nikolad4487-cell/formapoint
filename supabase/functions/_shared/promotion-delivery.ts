@@ -2,13 +2,29 @@ import { admin, checked } from './http.ts';
 import { normalizeAppUrl } from './app-url.ts';
 import { promotionEmail } from './promotion-email.ts';
 export async function processPromotions(campaign: string | null = null) {
-  const totals = { sent: 0, failed: 0, skipped: 0, claimed: 0, deferred: 0, available: true };
+  const totals = {
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    claimed: 0,
+    deferred: 0,
+    available: true,
+    birthday_available: true,
+    birthday_queued: 0,
+  };
   const key = Deno.env.get('RESEND_API_KEY'),
     from = Deno.env.get('EMAIL_FROM'),
     origin = Deno.env.get('APP_URL');
   if (!key || !from || !origin) return { ...totals, available: false };
   const app = normalizeAppUrl(origin),
     db = admin();
+  // The existing minute worker also creates today's birthday codes. Missing 016
+  // does not prevent delivery of ordinary campaigns during deployment.
+  if (!campaign) {
+    const birthdays = await db.rpc('enqueue_birthday_promotions');
+    totals.birthday_available = !birthdays.error;
+    totals.birthday_queued = birthdays.error ? 0 : birthdays.data || 0;
+  }
   const claimed = await db.rpc('claim_promotions', { p_campaign: campaign, p_limit: 10 });
   if (claimed.error) return { ...totals, available: false };
   const jobs = claimed.data || [];

@@ -1523,6 +1523,8 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
     last_name: string;
     phone: string | null;
     marketing_consent: boolean;
+    birthday_day?: number | null;
+    birthday_month?: number | null;
   }>('profiles', { id: session!.user.id });
   const cache = useQueryClient();
   return (
@@ -1537,6 +1539,12 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
               await action(async () => {
+                const day = Number(f.get('birthday_day')),
+                  month = Number(f.get('birthday_month'));
+                if ((day || month) && (!day || !month || new Date(2000, month, 0).getDate() < day))
+                  throw new Error(
+                    'Odaberite valjan dan i mjesec rođenja ili ostavite oba polja prazna.',
+                  );
                 const { error } = await requireDb()
                   .from('profiles')
                   .update({
@@ -1544,6 +1552,16 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
                     last_name: String(f.get('last')).trim(),
                     phone: String(f.get('phone')).trim() || null,
                     marketing_consent: f.get('marketing') === 'on',
+                    ...(q.data?.[0] && 'birthday_day' in q.data[0]
+                      ? {
+                          birthday_day: f.get('birthday_day')
+                            ? Number(f.get('birthday_day'))
+                            : null,
+                          birthday_month: f.get('birthday_month')
+                            ? Number(f.get('birthday_month'))
+                            : null,
+                        }
+                      : {}),
                   })
                   .eq('id', session!.user.id);
                 if (error) throw error;
@@ -1565,6 +1583,53 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
               Telefon
               <input name="phone" type="tel" maxLength={40} defaultValue={q.data[0].phone || ''} />
             </label>
+            {'birthday_day' in q.data[0] && (
+              <fieldset>
+                <legend>Rođendan (neobvezno)</legend>
+                <p>
+                  Unesite dan i mjesec za osobni rođendanski poklon. Godina rođenja nije potrebna.
+                  Za slanje uključite novosti i ponude.
+                </p>
+                <div className="form-row">
+                  <label>
+                    Dan rođenja
+                    <select name="birthday_day" defaultValue={q.data[0].birthday_day || ''}>
+                      <option value="">Bez dana</option>
+                      {Array.from({ length: 31 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          {i + 1}.
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Mjesec rođenja
+                    <select name="birthday_month" defaultValue={q.data[0].birthday_month || ''}>
+                      <option value="">Bez mjeseca</option>
+                      {[
+                        'Siječanj',
+                        'Veljača',
+                        'Ožujak',
+                        'Travanj',
+                        'Svibanj',
+                        'Lipanj',
+                        'Srpanj',
+                        'Kolovoz',
+                        'Rujan',
+                        'Listopad',
+                        'Studeni',
+                        'Prosinac',
+                      ].map((month, i) => (
+                        <option key={month} value={i + 1}>
+                          {month}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <small>Za uklanjanje rođendana ostavite oba polja prazna.</small>
+              </fieldset>
+            )}
             <label className="checkbox">
               <input
                 name="marketing"

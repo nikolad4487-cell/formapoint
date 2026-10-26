@@ -101,3 +101,5 @@ Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upu
 [Personalizirane promocije](docs/PERSONALIZIRANE-PROMOCIJE.md) – Božić, rođendan, Uskrs, osobni kodovi na 30 dana i slanje e-pošte; SQL nadogradnja 014.
 
 Zakazano slanje promocija na početak valjanosti i 30 dana od tog početka: [SQL nadogradnja 015](public/migracije/202610260015_scheduled_promotions.sql), nakon 014.
+
+Automatske rođendanske promocije: SQL nadogradnja `public/migracije/202610260016_birthday_promotions.sql` nakon 015, zatim `npm run deploy:promotions`. Korisnik unosi dan i mjesec u Moj profil, administrator sprema godišnje pravilo u Popusti i kuponi. Detalji: [promocije](docs/PERSONALIZIRANE-PROMOCIJE.md).

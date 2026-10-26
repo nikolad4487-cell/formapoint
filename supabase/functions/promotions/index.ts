@@ -38,6 +38,7 @@ serve(async (req) => {
       schema_ready: !schema.error,
       worker_ready: (await db.rpc('promotion_worker_ready')).data === true,
       scheduled_sending_ready: (await db.rpc('promotion_schedule_ready')).data === true,
+      birthday_ready: !(await db.from('birthday_promotion_settings').select('id').limit(1)).error,
       email_configured: missing.length === 0,
       missing_email_settings: missing,
     });
@@ -64,14 +65,22 @@ serve(async (req) => {
       url: db.storage.from('promotion-images').getPublicUrl(path).data.publicUrl,
     });
   }
-  if (action === 'create') {
+  if (action === 'create' || action === 'birthday-save') {
+    if (action === 'create' && body.occasion === 'birthday')
+      return json(
+        req,
+        {
+          error: 'Za rođendane spremite automatsku rođendansku promociju, bez zajedničkih datuma.',
+        },
+        400,
+      );
     if (!Deno.env.get('RESEND_API_KEY') || !Deno.env.get('EMAIL_FROM') || !Deno.env.get('APP_URL'))
       return json(
         req,
         { error: 'Slanje e-pošte nije konfigurirano. Promocija nije kreirana.' },
         503,
       );
-    if (body.starts_at && new Date(body.starts_at).getTime() > Date.now()) {
+    if (action === 'create' && body.starts_at && new Date(body.starts_at).getTime() > Date.now()) {
       const schedule = await db.rpc('promotion_schedule_ready');
       if (schedule.error || schedule.data !== true)
         return json(
@@ -80,7 +89,7 @@ serve(async (req) => {
           400,
         );
     }
-    if (!uuid(body.request_id))
+    if (action === 'create' && !uuid(body.request_id))
       return json(req, { error: 'Nedostaje identifikator promocije.' }, 400);
     const theme = promotionThemes[body.occasion as PromotionOccasion];
     if (!theme) return json(req, { error: 'Odaberite prigodu promocije.' }, 400);
@@ -97,6 +106,30 @@ serve(async (req) => {
       global: { headers: { Authorization: req.headers.get('authorization')! } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
+    if (action === 'birthday-save') {
+      const result = await caller.rpc('save_birthday_promotion', {
+        p_name: body.name,
+        p_kind: body.kind,
+        p_value: body.value,
+        p_subject: body.subject,
+        p_message: body.message,
+        p_image_url: imageUrl,
+        p_days: body.validity_days ?? 30,
+        p_active: body.active ?? true,
+      });
+      if (result.error)
+        return json(
+          req,
+          {
+            error:
+              result.error.code === 'PGRST202'
+                ? 'Najprije primijenite SQL nadogradnju 016.'
+                : result.error.message,
+          },
+          400,
+        );
+      return json(req, { saved: true });
+    }
     const result = await caller.rpc('create_personal_promotion', {
       p_request: body.request_id,
       p_name: body.name,

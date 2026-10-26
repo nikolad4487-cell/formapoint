@@ -69,12 +69,15 @@ try {
           '202610260013_category_service_slugs.sql',
           '202610260014_personal_promotions.sql',
           '202610260015_scheduled_promotions.sql',
+          '202610260016_birthday_promotions.sql',
         ].includes(file)
           ? `public/migracije/${file}`
           : `supabase/migrations/${file}`,
         'utf8',
       ),
     );
+    if (file === '202610260016_birthday_promotions.sql')
+      sql(readFileSync(`public/migracije/${file}`, 'utf8'));
     console.log(`Migracija: ${file}`);
   }
   console.log(
@@ -99,7 +102,9 @@ try {
         '\n' +
         readFileSync('tests/personal-promotions.sql', 'utf8') +
         '\n' +
-        readFileSync('tests/scheduled-promotions.sql', 'utf8'),
+        readFileSync('tests/scheduled-promotions.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/birthday-promotions.sql', 'utf8'),
     ),
   );
   // Dva različita kupona izbjegavaju serijalizaciju samo na retku istog kupona.

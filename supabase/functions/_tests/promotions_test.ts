@@ -19,6 +19,8 @@ Deno.test(
     let statuses: string[] = [];
     let email: any;
     let seenCreate: any;
+    let seenBirthday: any;
+    let birthdayRuns = 0;
     const campaign = 'd8000000-0000-4000-8000-000000000001',
       delivery = 'd8000000-0000-4000-8000-000000000002',
       claim = 'd8000000-0000-4000-8000-000000000003';
@@ -75,6 +77,15 @@ Deno.test(
         assert.equal(update.attempts, 0);
         assert.equal(update.first_attempt_at, undefined);
         assert(url.searchParams.get('first_attempt_at')?.startsWith('gt.'));
+        return json(null);
+      }
+      if (url.pathname.endsWith('/enqueue_birthday_promotions')) {
+        birthdayRuns++;
+        return json(0);
+      }
+      if (url.pathname.endsWith('/save_birthday_promotion')) {
+        assert.equal(req.headers.get('authorization'), 'Bearer administrator-token');
+        seenBirthday = await req.json();
         return json(null);
       }
       if (url.pathname.endsWith('/promotion_schedule_ready')) return json(scheduleReady);
@@ -174,6 +185,38 @@ Deno.test(
         assert.equal((await request({ ...create, starts_at: starts })).status, 200);
         assert.equal(seenCreate.p_starts, starts);
       });
+      await t.step(
+        'rođendan sprema godišnje pravilo bez trenutnog slanja i bez zajedničkih datuma',
+        async () => {
+          const before = sent;
+          assert.equal((await request({ ...create, occasion: 'birthday' })).status, 400);
+          assert.equal(
+            (
+              await request({
+                ...create,
+                action: 'birthday-save',
+                occasion: 'birthday',
+                validity_days: 30,
+              })
+            ).status,
+            200,
+          );
+          assert.equal(sent, before);
+          assert.equal(seenBirthday.p_days, 30);
+          assert.equal(seenBirthday.p_active, true);
+          assert.equal(
+            seenBirthday.p_image_url,
+            'https://www.formapoint.online/promotions/birthday.jpg',
+          );
+          assert.equal(seenBirthday.p_starts, undefined);
+          role = 'CUSTOMER';
+          assert.equal(
+            (await request({ ...create, action: 'birthday-save', occasion: 'birthday' })).status,
+            403,
+          );
+          role = 'ADMIN';
+        },
+      );
       await t.step('odjava nakon kreiranja preskače slanje', async () => {
         hasJob = true;
         allowed = false;
@@ -241,7 +284,9 @@ Deno.test(
         workerAllowed = true;
         role = 'CUSTOMER';
         hasJob = false;
+        const before = birthdayRuns;
         assert.equal((await request({ action: 'process' }, 'e'.repeat(64))).status, 200);
+        assert.equal(birthdayRuns, before + 1);
       });
     } finally {
       Deno.serve = originalServe;
