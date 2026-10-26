@@ -322,3 +322,79 @@ test('brisanje neprazne kategorije prikazuje poruku poslužitelja', async ({ pag
   ).toBeVisible();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
+
+test('novi artikl Prezentacije dobiva jedinstvenu oznaku uz postojeći izrada slug', async ({
+  page,
+}) => {
+  let saved: Record<string, unknown> | undefined;
+  await page.route('**/rest/v1/services*', async (route) => {
+    const req = route.request(),
+      url = new URL(req.url());
+    if (req.method() === 'GET' && url.searchParams.has('slug')) {
+      return route.fulfill({
+        json:
+          url.searchParams.get('slug') === 'eq.izrada'
+            ? [{ id: 'existing-article-in-other-category' }]
+            : [],
+      });
+    }
+    if (req.method() === 'POST') {
+      saved = req.postDataJSON();
+      return route.fulfill({ status: 201, json: null });
+    }
+    return route.fallback();
+  });
+  await page.goto('/admin/usluge');
+  const category = page
+    .locator('.catalog-category')
+    .filter({ has: page.getByRole('heading', { name: 'Prezentacije', exact: true }) });
+  await category.getByRole('button', { name: 'Usluga', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nova usluga' });
+  await dialog.getByLabel('Naziv', { exact: true }).fill('Izrada prezentacije');
+  await dialog.getByLabel('Slug', { exact: true }).fill('izrada');
+  await dialog
+    .getByLabel('Opis', { exact: true })
+    .fill('Izrada prezentacije do dogovorenog broja slajdova.');
+  await dialog.getByLabel('Cijena (€; prazno za individualnu ponudu)', { exact: true }).fill('20');
+  await expect(dialog.getByLabel('Kategorija', { exact: true })).toHaveValue('Prezentacije');
+  await dialog.getByRole('button', { name: 'Spremi uslugu' }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(saved).toMatchObject({
+    slug: 'izrada-prezentacije',
+    category: 'Prezentacije',
+    price_cents: 2000,
+  });
+  await expect(
+    page.getByText('Artikl je spremljen. Njegova oznaka u URL-u je izrada-prezentacije.'),
+  ).toBeVisible();
+});
+
+test('neuspjelo spremanje artikla prikazuje razlog i čuva unesene podatke', async ({ page }) => {
+  await page.route('**/rest/v1/services*', async (route) => {
+    const req = route.request();
+    if (req.method() === 'GET' && new URL(req.url()).searchParams.has('slug'))
+      return route.fulfill({ json: [] });
+    if (req.method() === 'POST')
+      return route.fulfill({
+        status: 403,
+        json: { code: '42501', message: 'new row violates row-level security policy' },
+      });
+    return route.fallback();
+  });
+  await page.goto('/admin/usluge');
+  await page.getByRole('button', { name: 'Usluga', exact: true }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'Nova usluga' });
+  await dialog.getByLabel('Naziv', { exact: true }).fill('Novi artikl ostaje otvoren');
+  await dialog.getByLabel('Slug', { exact: true }).fill('novi-artikl');
+  await dialog
+    .getByLabel('Opis', { exact: true })
+    .fill('Uneseni opis ne smije se izgubiti nakon greške.');
+  await dialog.getByRole('button', { name: 'Spremi uslugu' }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Nemate ovlasti za spremanje artikla.');
+  await expect(dialog.getByLabel('Naziv', { exact: true })).toHaveValue(
+    'Novi artikl ostaje otvoren',
+  );
+  await expect(dialog.getByLabel('Opis', { exact: true })).toHaveValue(
+    'Uneseni opis ne smije se izgubiti nakon greške.',
+  );
+});

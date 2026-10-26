@@ -1,3 +1,4 @@
+import { saveCatalogService, catalogError } from '../lib/catalog-editor';
 import { useSiteSettings, usePublishedPage } from '../hooks/use-site-settings';
 import { WorkPreviewGallery } from '../components/work-preview-gallery';
 import { WorkDeliveryUpload } from '../components/work-delivery-upload';
@@ -1943,13 +1944,17 @@ export function ServiceEditor({
 }) {
   const cache = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+  const categories = useRows<{ id: string; name: string }>('service_categories');
+  const [category, setCategory] = useState(service?.category || initialCategory || 'Ostalo');
   return (
     <form
       onSubmit={async (e) => {
         e.preventDefault();
         const f = new FormData(e.currentTarget);
         setBusy(true);
-        const ok = await action(async () => {
+        setFormError('');
+        try {
           const fields = {
             name: String(f.get('name')),
             slug: String(f.get('slug')),
@@ -1967,15 +1972,21 @@ export function ServiceEditor({
             included: String(f.get('included')).split('\n').filter(Boolean),
             excluded: String(f.get('excluded')).split('\n').filter(Boolean),
           };
-          const db = requireDb();
-          const { error } = await (service
-            ? db.from('services').update(fields).eq('id', service.id)
-            : db.from('services').insert(fields));
-          if (error) throw error;
+          const savedSlug = await saveCatalogService(requireDb(), fields, service?.id);
           await cache.invalidateQueries({ queryKey: ['services'] });
-        });
-        setBusy(false);
-        if (ok) done();
+          toast.success(
+            savedSlug !== fields.slug
+              ? `Artikl je spremljen. Njegova oznaka u URL-u je ${savedSlug}.`
+              : 'Artikl je spremljen.',
+          );
+          done();
+        } catch (error) {
+          const message = catalogError(error);
+          setFormError(message);
+          toast.error(message);
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <label>
@@ -1984,15 +1995,36 @@ export function ServiceEditor({
       </label>
       <label>
         Slug
-        <input name="slug" pattern="[a-z0-9-]+" required defaultValue={service?.slug} />
-      </label>
-      <label>
-        Kategorija
         <input
+          name="slug"
+          pattern="[a-z0-9-]+"
+          required
+          defaultValue={service?.slug}
+          aria-describedby={!service ? 'service-slug-help' : undefined}
+        />
+      </label>
+      {!service && (
+        <small id="service-slug-help">
+          Ako je oznaka zauzeta, automatski se dodaje naziv kategorije.
+        </small>
+      )}
+      <label>
+        <span id="service-category-label">Kategorija</span>
+        <select
+          aria-labelledby="service-category-label"
           name="category"
           required
-          defaultValue={service?.category || initialCategory || 'Ostalo'}
-        />
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
+          disabled={categories.isPending || categories.isError}
+        >
+          <option value="">Odaberite kategoriju</option>
+          {categories.data?.map((c) => (
+            <option key={c.id} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </label>
       <label>
         Ikona
@@ -2054,7 +2086,20 @@ export function ServiceEditor({
         <input name="active" type="checkbox" defaultChecked={service?.active ?? true} />
         Aktivna usluga
       </label>
-      <Button disabled={busy}>Spremi uslugu</Button>
+      {formError && (
+        <p role="alert" className="field-error">
+          {formError}
+        </p>
+      )}
+      {categories.isError && (
+        <p role="alert">
+          Kategorije nije moguće učitati.{' '}
+          <button type="button" onClick={() => void categories.refetch()}>
+            Pokušaj ponovno
+          </button>
+        </p>
+      )}
+      <Button disabled={busy || categories.isPending || categories.isError}>Spremi uslugu</Button>
     </form>
   );
 }
