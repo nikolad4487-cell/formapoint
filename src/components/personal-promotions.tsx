@@ -63,6 +63,7 @@ export function PersonalPromotions() {
         schema_ready: boolean;
         worker_ready?: boolean;
         email_configured: boolean;
+        missing_email_settings?: string[];
       }>,
     retry: false,
   });
@@ -193,20 +194,79 @@ export function PersonalPromotions() {
           Nova promocija
         </Button>
       </div>
-      {!ready && (
+      {health.isPending && <p role="status">Provjeravam postavke promocija…</p>}
+      {health.isError && (
         <div className="notice">
           <Mail />
-          <p>
-            Za slanje su potrebni SQL nadogradnja 014 i konfigurirano slanje e-pošte.{' '}
-            <a
-              className="text-link"
-              href="/migracije/202610260014_personal_promotions.sql"
-              target="_blank"
-              rel="noreferrer"
+          <div>
+            <p>
+              Funkcija promocija trenutačno nije dostupna. Provjerite njezinu objavu naredbom{' '}
+              <code>npm run deploy:promotions</code>.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => void health.refetch()}>
+              Provjeri ponovno
+            </Button>
+          </div>
+        </div>
+      )}
+      {health.data?.schema_ready === false && (
+        <div className="notice">
+          <Mail />
+          <div>
+            <p>
+              Potrebna je SQL nadogradnja 014.{' '}
+              <a
+                className="text-link"
+                href="/migracije/202610260014_personal_promotions.sql"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Otvori SQL nadogradnju
+              </a>
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void health.refetch();
+                void campaigns.refetch();
+              }}
             >
-              Otvori SQL nadogradnju
-            </a>
-          </p>
+              Provjeri ponovno
+            </Button>
+          </div>
+        </div>
+      )}
+      {health.data?.schema_ready && !health.data.email_configured && (
+        <div className="notice">
+          <Mail />
+          <div>
+            <p>Baza je spremna. Slanje e-pošte još nije konfigurirano.</p>
+            <p>
+              {health.data.missing_email_settings?.length
+                ? 'Nedostaje: ' + health.data.missing_email_settings.join(', ') + '.'
+                : 'U Supabase Secrets provjerite RESEND_API_KEY, EMAIL_FROM i APP_URL.'}
+            </p>
+            <div className="actions">
+              <Button asChild size="sm" variant="outline">
+                <a
+                  href="https://supabase.com/dashboard/project/heseilggogbtmqeuwlku/functions/secrets"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Otvori postavke e-pošte
+                </a>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={health.isFetching}
+                onClick={() => void health.refetch()}
+              >
+                Provjeri ponovno
+              </Button>
+            </div>
+          </div>
         </div>
       )}
       {ready && !health.data?.worker_ready && (
@@ -477,6 +537,16 @@ export function PersonalPromotions() {
             <p role="alert" className="field-error">
               {error}
             </p>
+          )}
+          {!ready && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={health.isFetching}
+              onClick={() => void health.refetch()}
+            >
+              Provjeri postavke slanja
+            </Button>
           )}
           <Button disabled={busy || imageBusy || !ready}>
             {busy ? 'Kreiranje i slanje…' : 'Izradi kodove i pošalji e-mail'}

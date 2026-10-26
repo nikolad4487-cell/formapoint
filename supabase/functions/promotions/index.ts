@@ -31,12 +31,14 @@ serve(async (req) => {
   }
   if (action === 'health') {
     const schema = await db.from('promotion_campaigns').select('id').limit(1);
+    const missing = ['RESEND_API_KEY', 'EMAIL_FROM', 'APP_URL'].filter(
+      (name) => !Deno.env.get(name)?.trim(),
+    );
     return json(req, {
       schema_ready: !schema.error,
       worker_ready: (await db.rpc('promotion_worker_ready')).data === true,
-      email_configured: Boolean(
-        Deno.env.get('RESEND_API_KEY') && Deno.env.get('EMAIL_FROM') && Deno.env.get('APP_URL'),
-      ),
+      email_configured: missing.length === 0,
+      missing_email_settings: missing,
     });
   }
   if (action === 'upload-image') {
