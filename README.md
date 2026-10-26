@@ -97,3 +97,5 @@ Administratorske kartice, CMS, portfolio, newsletter i proširene postavke: [upu
 [Postavljanje AI asistenta](docs/AI-ASISTENT.md) – Gemini ključ i objava funkcije kroz Codespaces.
 
 [Slugovi artikala po kategorijama](docs/SLUGOVI-PO-KATEGORIJAMA.md) – javne putanje `/kategorija/artikl` i SQL nadogradnja 013.
+
+[Personalizirane promocije](docs/PERSONALIZIRANE-PROMOCIJE.md) – Božić, rođendan, Uskrs, osobni kodovi na 30 dana i slanje e-pošte; SQL nadogradnja 014.

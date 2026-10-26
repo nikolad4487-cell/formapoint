@@ -1,3 +1,4 @@
+import { PersonalPromotions } from '../../components/personal-promotions';
 import { EuroInput } from '../../components/euro-input';
 import { eurosToCents } from '../../lib/currency';
 import { useState } from 'react';
@@ -86,6 +87,7 @@ export function DiscountsAdmin() {
           </Button>
         }
       />
+      <PersonalPromotions />
       <AdminData query={q}>
         <div className="admin-template-grid">
           {q.data?.length ? (

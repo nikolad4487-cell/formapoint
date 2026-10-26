@@ -1,3 +1,4 @@
+import { processPromotions } from '../_shared/promotion-delivery.ts';
 import { admin, checked, env, json, serve } from '../_shared/http.ts';
 serve(async (req) => {
   if (req.headers.get('authorization') !== `Bearer ${env('CRON_SECRET')}`)
@@ -48,5 +49,5 @@ serve(async (req) => {
       );
     }
   }
-  return json(req, { sent });
+  return json(req, { sent, promotions: await processPromotions() });
 });

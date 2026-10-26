@@ -1,0 +1,117 @@
+import { test, expect } from '@playwright/test';
+import { workspaceFixture, fixtureUser } from '../fixtures/workspace';
+test('prigodna promocija personalizira pregled i šalje odabranom korisniku s automatskim rokom', async ({
+  page,
+}, testInfo) => {
+  await workspaceFixture(page, { admin: true });
+  let created = false;
+  let body: any;
+  await page.route('**/rest/v1/rpc/personal_promotion_summary', (route) =>
+    route.fulfill({
+      json: created
+        ? [
+            {
+              id: 'd8000000-0000-4000-8000-000000000001',
+              name: 'Rođendanski poklon',
+              occasion: 'birthday',
+              recipients: 1,
+              sent: 1,
+              pending: 0,
+              failed: 0,
+              skipped: 0,
+              starts_at: '2026-10-26T12:00:00Z',
+              expires_at: '2026-11-25T12:00:00Z',
+            },
+          ]
+        : [],
+    }),
+  );
+  await page.route('**/functions/v1/promotions', async (route) => {
+    const value = route.request().postDataJSON();
+    if (value.action === 'health')
+      return route.fulfill({
+        json: { schema_ready: true, email_configured: true, worker_ready: true },
+      });
+    if (value.action === 'create') {
+      created = true;
+      body = value;
+      return route.fulfill({
+        json: {
+          campaign_id: 'd8000000-0000-4000-8000-000000000001',
+          claimed: 1,
+          sent: 1,
+          failed: 0,
+          skipped: 0,
+          available: true,
+        },
+      });
+    }
+    return route.fulfill({ json: { claimed: 0, sent: 0, available: true } });
+  });
+  await page.goto('/admin/kuponi');
+  await page.getByRole('button', { name: 'Nova promocija', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nova personalizirana promocija' });
+  await dialog.getByLabel('Naziv promocije', { exact: true }).fill('Rođendanski poklon');
+  await dialog.getByRole('combobox', { name: 'Prigoda', exact: true }).selectOption('birthday');
+  await expect(dialog.getByLabel('Naslov e-maila')).toHaveValue(
+    'Sretan rođendan, {ime}! Tvoj FormaPoint poklon',
+  );
+  await expect(dialog.locator('img')).toHaveAttribute('src', '/promotions/birthday.jpg');
+  await dialog.getByLabel('Vrijednost (%)').fill('15');
+  await dialog.getByRole('combobox', { name: 'Primatelji', exact: true }).selectOption('selected');
+  await dialog.getByRole('checkbox').first().check();
+  await dialog
+    .getByLabel('Personalizirana poruka')
+    .fill('Pozdrav {ime}, tvoj rođendanski poklon je {popust}. Iskoristi {kod} do {do}.');
+  await dialog.locator('summary').click();
+  const preview = dialog.frameLocator('iframe[title="Pregled promotivnog e-maila"]');
+  await expect(preview.getByText('RODJENDAN-PRIMJER', { exact: true })).toBeVisible();
+  await expect(preview.locator('body')).toContainText('15 %');
+  await page.screenshot({ path: `/tmp/formapoint-promotions-${testInfo.project.name}.png` });
+  await dialog.getByRole('button', { name: 'Izradi kodove i pošalji e-mail', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(body).toMatchObject({
+    occasion: 'birthday',
+    value: 15,
+    kind: 'percent',
+    user_ids: [fixtureUser],
+    starts_at: null,
+    expires_at: null,
+    image_url: null,
+  });
+  expect(body.request_id).toMatch(/^[a-f0-9-]{36}$/);
+  await expect(
+    page.getByText('1 kodova · 1 poslano · 0 čeka · 0 neuspjelo · 0 preskočeno'),
+  ).toBeVisible();
+});
+test('neuspješno kreiranje čuva podatke i isti identifikator zahtjeva za siguran ponovni pokušaj', async ({
+  page,
+}) => {
+  await workspaceFixture(page, { admin: true });
+  const requests: any[] = [];
+  await page.route('**/rest/v1/rpc/personal_promotion_summary', (route) =>
+    route.fulfill({ json: [] }),
+  );
+  await page.route('**/functions/v1/promotions', (route) => {
+    const value = route.request().postDataJSON();
+    if (value.action === 'health')
+      return route.fulfill({
+        json: { schema_ready: true, email_configured: true, worker_ready: true },
+      });
+    requests.push(value);
+    return route.fulfill({
+      status: 503,
+      json: { error: 'Slanje trenutačno nije dostupno. Pokušajte ponovno.' },
+    });
+  });
+  await page.goto('/admin/kuponi');
+  await page.getByRole('button', { name: 'Nova promocija', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nova personalizirana promocija' });
+  await dialog.getByLabel('Naziv promocije', { exact: true }).fill('Božićni poklon');
+  await dialog.getByRole('button', { name: 'Izradi kodove i pošalji e-mail', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Slanje trenutačno nije dostupno.');
+  await expect(dialog.getByLabel('Naziv promocije', { exact: true })).toHaveValue('Božićni poklon');
+  await dialog.getByRole('button', { name: 'Izradi kodove i pošalji e-mail', exact: true }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[0].request_id).toBe(requests[1].request_id);
+});

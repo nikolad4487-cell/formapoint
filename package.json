@@ -5,21 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "node scripts/prepare-pdf-assets.mjs && vite --host 0.0.0.0",
-    "build": "node scripts/prepare-pdf-assets.mjs && node scripts/build-category-slugs-upgrade.mjs --check && node scripts/build-guest-upgrade.mjs --check && node scripts/build-bank-method-upgrade.mjs --check && node scripts/build-checkout-upgrade.mjs --check && node scripts/build-catalog-upgrade.mjs --check && node scripts/build-payment-methods-upgrade.mjs --check && node scripts/build-commerce-upgrade.mjs --check && node scripts/build-admin-upgrade.mjs --check && node scripts/check-public-config.mjs && tsc -b && vite build && node scripts/check-public-config.mjs --dist",
+    "build": "node scripts/prepare-pdf-assets.mjs && node scripts/build-promotions-upgrade.mjs --check && node scripts/build-category-slugs-upgrade.mjs --check && node scripts/build-guest-upgrade.mjs --check && node scripts/build-bank-method-upgrade.mjs --check && node scripts/build-checkout-upgrade.mjs --check && node scripts/build-catalog-upgrade.mjs --check && node scripts/build-payment-methods-upgrade.mjs --check && node scripts/build-commerce-upgrade.mjs --check && node scripts/build-admin-upgrade.mjs --check && node scripts/check-public-config.mjs && tsc -b && vite build && node scripts/check-public-config.mjs --dist",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "typecheck": "tsc -b",
     "db:test": "node scripts/test-database.mjs",
     "format": "prettier --write src tests scripts *.ts *.json *.html docs README.md",
-    "check:edge": "deno check --node-modules-dir=none --no-config --lock=supabase/functions/deno.lock --frozen supabase/functions/checkout/index.ts supabase/functions/stripe-webhook/index.ts supabase/functions/download/index.ts supabase/functions/upload/index.ts supabase/functions/contact/index.ts supabase/functions/notify/index.ts supabase/functions/admin-tools/index.ts supabase/functions/portfolio-download/index.ts supabase/functions/ai-assistant/index.ts",
+    "check:edge": "deno check --node-modules-dir=none --no-config --lock=supabase/functions/deno.lock --frozen supabase/functions/checkout/index.ts supabase/functions/stripe-webhook/index.ts supabase/functions/download/index.ts supabase/functions/upload/index.ts supabase/functions/contact/index.ts supabase/functions/notify/index.ts supabase/functions/admin-tools/index.ts supabase/functions/portfolio-download/index.ts supabase/functions/ai-assistant/index.ts supabase/functions/promotions/index.ts",
     "backend:start": "bash scripts/start-local.sh",
     "backend:functions": "/workspace/.tools/formapoint/supabase functions serve --env-file .env.edge.local",
     "test:local": "node scripts/test-local.mjs",
     "test:edge": "deno test --allow-env --node-modules-dir=none --no-config --lock=supabase/functions/deno.lock --frozen supabase/functions/_tests",
     "deploy:files": "node scripts/deploy-files.mjs",
     "deploy:stripe": "node scripts/deploy-stripe.mjs",
-    "deploy:ai": "node scripts/deploy-ai.mjs"
+    "deploy:ai": "node scripts/deploy-ai.mjs",
+    "deploy:promotions": "node scripts/deploy-promotions.mjs"
   },
   "engines": {
     "node": ">=22.12"
