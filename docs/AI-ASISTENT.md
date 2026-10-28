@@ -18,17 +18,18 @@ Odgovore generira Google Gemini preko Supabase Edge funkcije `ai-assistant`. Klj
    ```
 
    Ako CLI javi da nema access token, prvo pokrenite `npx supabase login` i dovršite prijavu, zatim ponovite objavu.
+
 4. Pričekajte Vercelovu automatsku objavu i osvježite stranicu. Otvorite ikonu poruke u donjem desnom kutu i postavite pitanje.
 
 Nije potrebna SQL nadogradnja ni nova tablica. Za ograničavanje poziva koristi se postojeća funkcija `rate_limit`. Vercel varijabla `VITE_GEMINI_API_KEY` nije potrebna i ne smije se dodavati. Ključ nemojte spremati u GitHub datoteke ili poslati u razgovor.
 
 ## Znanje i granice
 
-Poslužitelj pri svakom pitanju dohvaća samo aktivni javni katalog i odabrane javne postavke platforme. Cijene u internim centima prikazuju se u EUR. Upute objašnjavaju košaricu, kupnju kao gost, jednokratno i 50/50 plaćanje, Stripe, mogućnost Google/Apple Paya, IBAN potvrdu i zaključavanje izvornih datoteka do pune uplate. Asistent ne smije izmišljati cijene, popuste ili naknade.
+Poslužitelj pri svakom pitanju dohvaća aktivni javni katalog, odabrane javne postavke platforme i aktualnu ponudu iz javnog bannera. Ponudu dohvaća funkcijom `discount_banner` s anonimnim javnim ključem, bez prosljeđivanja korisničke sesije. Tako zna javni kod, iznos, rok valjanosti i uvjet prve narudžbe, ali ne dobiva osobne kodove. Kod se ne upisuje u prompt unaprijed; administrativna promjena javne ponude vidi se već u sljedećem pitanju. Konačnu primjenjivost provjerava košarica, a asistent ne tvrdi da zna povijest kupnje posjetitelja. Ako ponude nema ili je provjera nedostupna, razlikuje ta stanja i ne tvrdi da platforma uopće nema kupone. Aktualni podaci imaju prednost pred ranijim pogrešnim odgovorima u istom razgovoru. Cijene u internim centima prikazuju se u EUR. Upute objašnjavaju košaricu, kupnju kao gost, jednokratno i 50/50 plaćanje, Stripe, mogućnost Google/Apple Paya, IBAN potvrdu i zaključavanje izvornih datoteka do pune uplate. Asistent ne smije izmišljati cijene, popuste ili naknade.
 
 Ne dohvaća narudžbe, profile, datoteke, privatne poruke niti podatke o stvarnim uplatama. Ne kreira narudžbe i ne potvrđuje plaćanje. Za osobne zahtjeve upućuje korisnika na narudžbe i podršku.
 
-Googleu se šalju korisnikovo pitanje, ograničena povijest razgovora i javni podaci kataloga/postavki. Widget to navodi korisniku. Povijest se ne sprema u bazu. Odgovori su običan tekst; HTML odgovora se ne izvršava. Pravila poslovanja postavlja samo poslužitelj.
+Googleu se šalju korisnikovo pitanje, ograničena povijest razgovora i javni podaci kataloga/postavki i javnog promotivnog bannera. Widget to navodi korisniku. Povijest se ne sprema u bazu. Odgovori su običan tekst; HTML odgovora se ne izvršava. Pravila poslovanja postavlja samo poslužitelj.
 
 ## Ograničenja i dostupnost
 

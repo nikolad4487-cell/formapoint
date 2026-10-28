@@ -9,10 +9,21 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
     empty = false;
   let providerCalls = 0;
   let payload: any;
+  let offerError = false;
+  let publicOffer: any = {
+    code: 'POPUST10',
+    kind: 'percent',
+    name: 'Popust 10%',
+    value: 10,
+    first_order_only: true,
+    expires_at: '2099-12-31T22:59:00Z',
+    private_field: 'MUST_NOT_REACH_MODEL',
+  };
   const reads = new Set<string>();
   for (const [k, v] of Object.entries({
     SUPABASE_URL: 'https://ai-test.supabase.invalid',
     SUPABASE_SERVICE_ROLE_KEY: 'fixture-service-key',
+    SUPABASE_ANON_KEY: 'fixture-public-key',
     APP_URL: 'https://www.formapoint.online',
     GEMINI_API_KEY: 'fixture-gemini-secret',
   }))
@@ -55,7 +66,12 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
     assert.equal(url.hostname, 'ai-test.supabase.invalid');
     const table = url.pathname.split('/').at(-1)!;
     reads.add(table);
-    assert(['rate_limit', 'services', 'site_settings'].includes(table));
+    assert(['rate_limit', 'services', 'site_settings', 'discount_banner'].includes(table));
+    if (table === 'discount_banner') {
+      assert.equal(req.headers.get('apikey'), 'fixture-public-key');
+      assert.equal(req.headers.get('authorization'), 'Bearer fixture-public-key');
+      return offerError ? json({ message: 'PRIVATE_OFFER_ERROR' }, 500) : json(publicOffer);
+    }
     if (table === 'rate_limit')
       return limited ? json({ code: 'P0001', message: 'rate' }, 400) : json(null);
     if (failedContext) return json({ message: 'DATABASE_PRIVATE_ERROR' }, 500);
@@ -131,8 +147,92 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
       assert(!payload.systemInstruction.parts[0].text.includes('price_cents'));
       assert(!payload.systemInstruction.parts[0].text.includes('CLIENT_SYSTEM_OVERRIDE'));
       assert(!JSON.stringify(payload).includes('fixture-gemini-secret'));
-      assert.deepEqual([...reads].sort(), ['rate_limit', 'services', 'site_settings']);
+      assert.deepEqual([...reads].sort(), [
+        'discount_banner',
+        'rate_limit',
+        'services',
+        'site_settings',
+      ]);
     });
+    await t.step(
+      'asistent dobiva javni kod i uvjet prve narudžbe, bez privatnih polja',
+      async () => {
+        await request({
+          messages: [
+            { role: 'user', content: 'Postoji li popust?' },
+            { role: 'assistant', content: 'Na FormaPointu ne postoje kuponi ni dodatni popusti.' },
+            { role: 'user', content: 'A POPUST10 za nove korisnike?' },
+          ],
+        });
+        const text = payload.systemInstruction.parts[0].text;
+        const context = JSON.parse(text.split('JAVNI PODACI: ')[1]);
+        assert.deepEqual(context.promotions, {
+          status: 'available',
+          code: 'POPUST10',
+          name: 'Popust 10%',
+          discount: '10 %',
+          first_order_only: true,
+          expires_at: '2099-12-31T22:59:00Z',
+        });
+        assert(text.includes('jasno ispravi tu informaciju'));
+        assert(!text.includes('MUST_NOT_REACH_MODEL'));
+      },
+    );
+    await t.step(
+      'promjene javne ponude odmah ulaze u novi upit i fiksni iznosi su u eurima',
+      async () => {
+        publicOffer = {
+          code: 'NOVI5',
+          kind: 'fixed',
+          value: 500,
+          name: 'Nova ponuda',
+          first_order_only: false,
+          expires_at: '2099-12-31T22:59:00Z',
+        };
+        await request();
+        const context = JSON.parse(
+          payload.systemInstruction.parts[0].text.split('JAVNI PODACI: ')[1],
+        );
+        assert.equal(context.promotions.code, 'NOVI5');
+        assert(context.promotions.discount.includes('5,00'));
+        assert.equal(context.promotions.first_order_only, false);
+        assert(!payload.systemInstruction.parts[0].text.includes('POPUST10'));
+      },
+    );
+    await t.step(
+      'odsutna, istekla i nedostupna ponuda razlikuju se bez tvrdnje da kupona nema',
+      async () => {
+        publicOffer = null;
+        assert.equal((await request()).status, 200);
+        assert.equal(
+          JSON.parse(payload.systemInstruction.parts[0].text.split('JAVNI PODACI: ')[1]).promotions
+            .status,
+          'no_public_banner',
+        );
+        publicOffer = {
+          code: 'ISTEKAO',
+          kind: 'percent',
+          value: 10,
+          expires_at: '2000-01-01T00:00:00Z',
+        };
+        await request();
+        assert.equal(
+          JSON.parse(payload.systemInstruction.parts[0].text.split('JAVNI PODACI: ')[1]).promotions
+            .status,
+          'unavailable',
+        );
+        assert(!payload.systemInstruction.parts[0].text.includes('ISTEKAO'));
+        offerError = true;
+        assert.equal((await request()).status, 200);
+        assert.equal(
+          JSON.parse(payload.systemInstruction.parts[0].text.split('JAVNI PODACI: ')[1]).promotions
+            .status,
+          'unavailable',
+        );
+        assert(!JSON.stringify(payload).includes('PRIVATE_OFFER_ERROR'));
+        offerError = false;
+      },
+    );
     await t.step('ograničenje zaustavlja trošak prije pružatelja', async () => {
       const before = providerCalls;
       limited = true;
