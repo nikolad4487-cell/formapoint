@@ -172,9 +172,11 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
           name: 'Popust 10%',
           discount: '10 %',
           first_order_only: true,
+          payment_restriction: 'card_full',
           expires_at: '2099-12-31T22:59:00Z',
         });
         assert(text.includes('jasno ispravi tu informaciju'));
+        assert(text.includes('popust NE vrijedi za kartično plaćanje 50/50 ni za IBAN'));
         assert(!text.includes('MUST_NOT_REACH_MODEL'));
       },
     );

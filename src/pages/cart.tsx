@@ -18,6 +18,8 @@ import { installments, type CartItem } from '../lib/domain';
 export interface CartPrice {
   subtotal: number;
   discount: number;
+  payment_restriction?: string;
+  coupon_payment_rules_ready?: boolean;
   total: number;
   split: boolean;
   count: number;
@@ -161,12 +163,19 @@ export function CartPage() {
     sessionStorage.setItem(storageKey, JSON.stringify({ draft, requestId, promo }));
   }, [draft, requestId, promo, storageKey]);
   const selected = choices.find((c) => c.id === selection)!;
-  const chosen =
-    selected.model === 'split' && !price.data?.split
+  const cardFullCoupon =
+    price.data?.payment_restriction === 'card_full' || promo.toUpperCase() === 'POPUST10';
+  const couponRulesMissing = cardFullCoupon && !price.data?.coupon_payment_rules_ready;
+  const chosen = cardFullCoupon
+    ? choices[0]
+    : selected.model === 'split' && !price.data?.split
       ? choices.find((c) => c.method === selected.method && c.model === 'full')!
       : selected;
   const allowed = (c: (typeof choices)[number]) =>
-    !!options.data?.[c.method] && (c.model !== 'split' || !!price.data?.split);
+    !couponRulesMissing &&
+    (!cardFullCoupon || (c.method === 'card' && c.model === 'full')) &&
+    !!options.data?.[c.method] &&
+    (c.model !== 'split' || !!price.data?.split);
   const total = price.data?.total;
   function field(key: keyof Draft, label: string, required = false, type = 'text') {
     return (
@@ -475,11 +484,14 @@ export function CartPage() {
                   </section>
                   <section className="panel">
                     <fieldset
-                      className={`payment-models checkout-plans ${price.data?.split ? '' : 'single-plan'}`}
+                      className={`payment-models checkout-plans ${price.data?.split && !cardFullCoupon ? '' : 'single-plan'}`}
                     >
                       <legend>Odaberite model plaćanja</legend>
                       {(['full', 'split'] as const)
-                        .filter((model) => model === 'full' || price.data?.split === true)
+                        .filter(
+                          (model) =>
+                            model === 'full' || (price.data?.split === true && !cardFullCoupon),
+                        )
                         .map((model) => (
                           <label key={model} className={chosen.model === model ? 'selected' : ''}>
                             <input
@@ -514,54 +526,56 @@ export function CartPage() {
                   <section className="panel">
                     <fieldset className="payment-models checkout-methods">
                       <legend>Odaberite način plaćanja</legend>
-                      {(['card', 'google_pay', 'apple_pay', 'bank'] as const).map((method) => {
-                        const c = choices.find(
-                          (choice) =>
-                            choice.method === method &&
-                            (choice.model === chosen.model ||
-                              ['google_pay', 'apple_pay'].includes(method)),
-                        )!;
-                        const supportedModel = !(
-                          ['google_pay', 'apple_pay'].includes(method) && chosen.model === 'split'
-                        );
-                        return (
-                          <label
-                            key={method}
-                            className={chosen.method === method ? 'selected' : ''}
-                          >
-                            <input
-                              type="radio"
-                              name="payment"
-                              value={c.id}
-                              checked={chosen.method === method}
-                              disabled={!supportedModel || !allowed(c) || busy}
-                              onChange={() => setSelection(c.id)}
-                            />
-                            {(() => {
-                              const icon = methodIcons.data?.find(
-                                (m) =>
-                                  m.code ===
-                                  (method === 'bank'
-                                    ? 'iban'
-                                    : method === 'card'
-                                      ? 'visa'
-                                      : method),
-                              )?.icon_url;
-                              return icon ? (
-                                <img
-                                  className="checkout-method-icon"
-                                  src={icon}
-                                  alt=""
-                                  referrerPolicy="no-referrer"
-                                />
-                              ) : null;
-                            })()}
-                            <strong>{c.label}</strong>
-                            {!options.data?.[method] && <span>Trenutačno nije aktivirano.</span>}
-                            {!supportedModel && <span>Dostupno uz jednokratno plaćanje.</span>}
-                          </label>
-                        );
-                      })}
+                      {(['card', 'google_pay', 'apple_pay', 'bank'] as const)
+                        .filter((method) => !cardFullCoupon || method === 'card')
+                        .map((method) => {
+                          const c = choices.find(
+                            (choice) =>
+                              choice.method === method &&
+                              (choice.model === chosen.model ||
+                                ['google_pay', 'apple_pay'].includes(method)),
+                          )!;
+                          const supportedModel = !(
+                            ['google_pay', 'apple_pay'].includes(method) && chosen.model === 'split'
+                          );
+                          return (
+                            <label
+                              key={method}
+                              className={chosen.method === method ? 'selected' : ''}
+                            >
+                              <input
+                                type="radio"
+                                name="payment"
+                                value={c.id}
+                                checked={chosen.method === method}
+                                disabled={!supportedModel || !allowed(c) || busy}
+                                onChange={() => setSelection(c.id)}
+                              />
+                              {(() => {
+                                const icon = methodIcons.data?.find(
+                                  (m) =>
+                                    m.code ===
+                                    (method === 'bank'
+                                      ? 'iban'
+                                      : method === 'card'
+                                        ? 'visa'
+                                        : method),
+                                )?.icon_url;
+                                return icon ? (
+                                  <img
+                                    className="checkout-method-icon"
+                                    src={icon}
+                                    alt=""
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : null;
+                              })()}
+                              <strong>{c.label}</strong>
+                              {!options.data?.[method] && <span>Trenutačno nije aktivirano.</span>}
+                              {!supportedModel && <span>Dostupno uz jednokratno plaćanje.</span>}
+                            </label>
+                          );
+                        })}
                     </fieldset>
                     <p>
                       Google Pay i Apple Pay dostupni su na podržanim uređajima i preglednicima na
@@ -599,7 +613,7 @@ export function CartPage() {
                     </li>
                   ))}
                 </ul>
-                {step === 0 && (
+                {(step === 0 || promo) && (
                   <>
                     <label>
                       Imate kod za popust?
@@ -632,6 +646,25 @@ export function CartPage() {
                       )}
                     </div>
                   </>
+                )}
+                {cardFullCoupon && (
+                  <p role="status">
+                    {promo} vrijedi samo za prvu narudžbu uz jednokratno plaćanje karticom. Ne
+                    vrijedi za 50/50 ni IBAN. Za drugi način plaćanja uklonite kupon.
+                  </p>
+                )}
+                {couponRulesMissing && (
+                  <p role="alert">
+                    Za ovaj kupon potrebno je primijeniti{' '}
+                    <a
+                      href="/migracije/202611100017_coupon_payment_rules.sql"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      SQL nadogradnju 017
+                    </a>
+                    . Narudžba još nije kreirana.
+                  </p>
                 )}
                 {price.error && (
                   <p role="alert">
@@ -682,6 +715,7 @@ export function CartPage() {
                   type="submit"
                   disabled={
                     busy ||
+                    couponRulesMissing ||
                     price.isPending ||
                     price.isFetching ||
                     price.isError ||

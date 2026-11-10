@@ -223,3 +223,52 @@ test('nedostajuća checkout nadogradnja nudi SQL 010 prije uključivanja IBAN-a'
   ).toHaveAttribute('href', '/migracije/202610250010_cart_checkout.sql');
   await expect(page.getByLabel('Omogući IBAN plaćanje (jednokratno i 50/50)')).toBeDisabled();
 });
+
+test('POPUST10 nudi samo jednokratnu karticu i uklanjanje vraća ostale metode', async ({
+  page,
+}) => {
+  await workspaceFixture(page, { stripe: true });
+  await page.route('**/rest/v1/rpc/checkout_options', (route) =>
+    route.fulfill({ json: { card: true, bank: true, google_pay: true, apple_pay: true } }),
+  );
+  await page.route('**/rest/v1/rpc/cart_pricing', (route) => {
+    const applied = route.request().postDataJSON().p_promo === 'POPUST10';
+    return route.fulfill({
+      json: {
+        subtotal: 2501,
+        discount: applied ? 250 : 0,
+        total: applied ? 2251 : 2501,
+        split: !applied,
+        count: 1,
+        payment_restriction: applied ? 'card_full' : 'any',
+        coupon_payment_rules_ready: true,
+      },
+    });
+  });
+  await page.goto('/app/kosarica');
+  await page.getByLabel('Imate kod za popust?').fill('POPUST10');
+  await page.getByRole('button', { name: 'Primijeni', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'POPUST10 vrijedi samo' })).toBeVisible();
+  await expect(page.locator('.cart-total')).toContainText('22,51');
+  await details(page);
+  await expect(page.getByRole('radio', { name: /Plaćanje u 2 rate/ })).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: /IBAN/ })).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: /Google Pay/ })).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: /Kartica/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Ukloni kupon', exact: true }).click();
+  await expect(page.locator('.cart-total')).toContainText('25,01');
+  await expect(page.getByRole('radio', { name: /Plaćanje u 2 rate/ })).toBeVisible();
+  await expect(page.getByRole('radio', { name: /IBAN/ })).toBeVisible();
+});
+
+test('POPUST10 bez serverske nadogradnje ne dopušta potvrdu narudžbe', async ({ page }) => {
+  await workspaceFixture(page, { stripe: true });
+  await page.route('**/rest/v1/rpc/cart_pricing', (route) =>
+    route.fulfill({ json: { subtotal: 2501, discount: 250, total: 2251, split: true, count: 1 } }),
+  );
+  await page.goto('/app/kosarica');
+  await page.getByLabel('Imate kod za popust?').fill('POPUST10');
+  await page.getByRole('button', { name: 'Primijeni', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'SQL nadogradnju 017' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nastavi na narudžbu' })).toBeDisabled();
+});

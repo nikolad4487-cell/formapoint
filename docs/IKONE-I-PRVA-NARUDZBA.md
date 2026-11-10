@@ -9,3 +9,11 @@ U **Popusti i kuponi → Novi popust → Kome vrijedi popust?** odaberite **Samo
 Ograničenje provodi baza i pri istodobnim zahtjevima s različitim kodovima. Odijeljeno zaključavanje po korisniku obuhvaća i obične narudžbe bez kupona. Pogrešan pokušaj ne ostavlja dodatnu narudžbu. Dosadašnje cijene i kupljene narudžbe se ne mijenjaju. Banner navodi uvjet prve narudžbe i ne prikazuje se prijavljenim kupcima koji već imaju narudžbe.
 
 Provjere: PostgreSQL testovi dozvola za Storage, RPC-a za ikone, uvjeta prve narudžbe, očuvanja običnih kupona i paralelne prve narudžbe s različitim kodovima; browser testovi stvarne pripreme PNG-a, uploada, uklanjanja ikone i spremanja pravila kupona na računalu i mobitelu. Testovi ne koriste stvarne kartice ili uplate.
+
+## POPUST10 — samo jednokratna kartica
+
+Nadogradnja `public/migracije/202611100017_coupon_payment_rules.sql` postavlja POPUST10 na prvu narudžbu i isključivo način **Kartica – jednokratno**. Ne vrijedi za karticu 50/50 ni IBAN. Ne mijenja iznose ili uplate postojećih narudžbi i ne kreira kupon ako ne postoji. Pravilo se automatski postavlja i ako se POPUST10 ponovno kreira.
+
+Uz primijenjen kupon košarica prikazuje samo jednokratnu karticu i jasno navodi uvjet. Uklanjanje kupona vraća ostale načine plaćanja. Baza provjerava stvarni način i model pri korištenju kupona te sprječava naknadnu promjenu na nepodržani način. Ostali kuponi zadržavaju svoja postojeća pravila. Banner, administracija i AI asistent navode ograničenje.
+
+Aktivacija: pokrenite cijelu SQL nadogradnju 017 nakon 014 (016 nije preduvjet), zatim u Codespaces `git pull --ff-only` i `npm run deploy:ai`. Frontend se objavljuje automatski s GitHuba. Ako 017 nedostaje, kupnja s POPUST10 zaustavlja se prije kreiranja narudžbe uz poveznicu na nadogradnju. Nije potrebno ponovno objavljivati Stripe funkcije.

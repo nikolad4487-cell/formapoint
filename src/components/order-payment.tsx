@@ -166,6 +166,8 @@ function ChangePaymentMethod({ order }: { order: Order }) {
     enabled: open,
     queryFn: () => rpc<Record<string, boolean>>('checkout_options'),
   });
+  if (String(order.checkout_details?.coupon_card_full) === 'true')
+    return <p>Kupon uz ovu narudžbu vrijedi samo za jednokratno plaćanje karticom.</p>;
   if (order.status !== 'deposit_pending' || order.paid_cents !== 0) return null;
   return (
     <div className="actions">

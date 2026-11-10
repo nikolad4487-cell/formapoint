@@ -26,6 +26,7 @@ interface Discount {
   customer_id: string | null;
   service_id: string | null;
   first_order_only?: boolean;
+  payment_restriction?: string;
 }
 export function DiscountsAdmin() {
   const q = useRows<Discount>('promo_codes'),
@@ -112,6 +113,9 @@ export function DiscountsAdmin() {
                     ? ` · ${services.data?.find((s) => s.id === c.service_id)?.name || 'Odabrana usluga'}`
                     : ''}
                 </p>
+                {(c.payment_restriction === 'card_full' || c.code.toUpperCase() === 'POPUST10') && (
+                  <p>Samo jednokratno karticom — ne vrijedi za 50/50 ni IBAN.</p>
+                )}
                 {c.banner && <p className="badge">Glavni banner</p>}
                 {c.first_order_only !== undefined && (
                   <label className="checkbox">
@@ -119,7 +123,7 @@ export function DiscountsAdmin() {
                       type="checkbox"
                       aria-label={`Samo novi korisnici za kupon ${c.code}`}
                       checked={c.first_order_only}
-                      disabled={Boolean(updating)}
+                      disabled={Boolean(updating) || c.code.toUpperCase() === 'POPUST10'}
                       onChange={(e) => void changeFirstOrder(c.id, e.target.checked)}
                     />
                     Samo korisnici bez prethodnih narudžbi
