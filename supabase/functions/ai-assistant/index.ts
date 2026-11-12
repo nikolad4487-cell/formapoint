@@ -72,6 +72,9 @@ serve(async (req) => {
   const publicDb = createClient(env('SUPABASE_URL'), env('SUPABASE_ANON_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  const refresh = await publicDb.rpc('refresh_service_prices');
+  if (refresh.error && !['PGRST202', '42883'].includes(refresh.error.code))
+    return json(req, { error: unavailable }, 503);
   // Only explicitly public catalogue/settings fields and the public banner RPC.
   const [services, settings, publicOffer, packageData] = await Promise.all([
     db

@@ -73,6 +73,7 @@ try {
           '202611100017_coupon_payment_rules.sql',
           '202611120018_social_links.sql',
           '202611120019_service_packages.sql',
+          '202611120020_scheduled_prices.sql',
         ].includes(file)
           ? `public/migracije/${file}`
           : `supabase/migrations/${file}`,
@@ -85,6 +86,7 @@ try {
         '202611100017_coupon_payment_rules.sql',
         '202611120018_social_links.sql',
         '202611120019_service_packages.sql',
+        '202611120020_scheduled_prices.sql',
       ].includes(file)
     )
       sql(readFileSync(`public/migracije/${file}`, 'utf8'));
@@ -118,7 +120,16 @@ try {
         '\n' +
         readFileSync('tests/coupon-payment-rules.sql', 'utf8') +
         '\n' +
-        readFileSync('tests/service-packages.sql', 'utf8'),
+        readFileSync('tests/service-packages.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/scheduled-prices.sql', 'utf8').replaceAll(
+          '-- REAPPLY_OWNER_PRICE_SEED',
+          readFileSync('supabase/migrations/202611120020_scheduled_prices.sql', 'utf8').slice(
+            readFileSync('supabase/migrations/202611120020_scheduled_prices.sql', 'utf8').indexOf(
+              '-- Odobreni cjenik vlasnika.',
+            ),
+          ),
+        ),
     ),
   );
   // Dva različita kupona izbjegavaju serijalizaciju samo na retku istog kupona.

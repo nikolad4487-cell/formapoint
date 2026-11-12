@@ -227,6 +227,14 @@ export async function workspaceFixture(
       await route.fulfill({ status: 200, headers, json: null });
       return;
     }
+    if (table === 'price_schedule_health') {
+      await route.fulfill({ json: { worker_ready: true, changes: [] } });
+      return;
+    }
+    if (table === 'refresh_service_prices') {
+      await route.fulfill({ json: 0 });
+      return;
+    }
     if (table === 'checkout_options') {
       await route.fulfill({
         status: 200,

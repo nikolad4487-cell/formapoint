@@ -5,8 +5,11 @@ import type { Service, ServicePackage } from '../lib/domain';
 export function useServices() {
   return useQuery({
     queryKey: ['services'],
+    refetchInterval: 60000,
     queryFn: async () => {
       if (!db) return catalog;
+      const refresh = await db.rpc('refresh_service_prices');
+      if (refresh.error && !['PGRST202', '42883'].includes(refresh.error.code)) throw refresh.error;
       const { data, error } = await db
         .from('services')
         .select('*,service_categories(slug)')

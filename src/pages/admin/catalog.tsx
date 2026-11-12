@@ -1,3 +1,4 @@
+import { ScheduledServicePrices, SchedulePriceEditor } from '../../components/scheduled-prices';
 import { ServicePackagesEditor } from '../../components/service-packages';
 import { DeleteCatalogItem } from '../../components/delete-catalog-item';
 import { useState } from 'react';
@@ -20,6 +21,7 @@ import { money } from '../../lib/utils';
 export function CatalogAdmin() {
   const categories = useRows<{ id: string; name: string }>('service_categories');
   const services = useRows<Service>('services');
+  const [priceFor, setPriceFor] = useState<Service | null>(null);
   const [packagesFor, setPackagesFor] = useState<Service | null>(null);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Service | undefined>();
@@ -39,6 +41,16 @@ export function CatalogAdmin() {
           </Button>
         }
       />
+      <ScheduledServicePrices />
+      <ConfirmationDialog
+        open={!!priceFor}
+        onOpenChange={(open) => {
+          if (!open) setPriceFor(null);
+        }}
+        title={priceFor ? `Nova cijena: ${priceFor.name}` : 'Zakazana cijena'}
+      >
+        {priceFor && <SchedulePriceEditor service={priceFor} done={() => setPriceFor(null)} />}
+      </ConfirmationDialog>
       <SearchInput value={search} onChange={setSearch} placeholder="Pretraži kategorije i usluge" />
       <ConfirmationDialog
         open={!!packagesFor}
@@ -145,6 +157,14 @@ export function CatalogAdmin() {
                                     onClick={() => setPackagesFor(s)}
                                   >
                                     Paketi
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPriceFor(s)}
+                                    disabled={s.packages_enabled}
+                                  >
+                                    Zakaži cijenu
                                   </Button>
                                   <DeleteCatalogItem id={s.id} name={s.name} />
                                 </div>

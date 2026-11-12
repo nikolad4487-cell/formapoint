@@ -1,7 +1,7 @@
 import { serviceReference } from '../lib/service-links';
 import { usePublicPaymentMethods } from '../hooks/use-payment-methods';
 import { AddToCartButton } from '../components/add-to-cart';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, Trash2 } from 'lucide-react';
@@ -20,6 +20,7 @@ export interface CartPrice {
   discount: number;
   payment_restriction?: string;
   coupon_payment_rules_ready?: boolean;
+  applied_price_changes?: number;
   total: number;
   split: boolean;
   count: number;
@@ -173,8 +174,27 @@ export function CartPage() {
     ],
     enabled: cart.isSuccess && items.length > 0,
     queryFn: () => rpc<CartPrice>('cart_pricing', { p_promo: promo || null }),
+    refetchInterval: 30000,
     retry: false,
   });
+  const lastCartPriceSync = useRef('');
+  useEffect(() => {
+    const subtotal = items.reduce(
+      (sum, item) => sum + (item.services?.price_cents || 0) * item.quantity,
+      0,
+    );
+    const syncKey = `${price.dataUpdatedAt}:${price.data?.subtotal}:${subtotal}`;
+    if (
+      lastCartPriceSync.current !== syncKey &&
+      price.data &&
+      !price.isFetching &&
+      !cart.isFetching &&
+      subtotal !== price.data.subtotal
+    ) {
+      lastCartPriceSync.current = syncKey;
+      void cache.invalidateQueries({ queryKey: ['cart'] });
+    }
+  }, [price.data, price.dataUpdatedAt, price.isFetching, cart.isFetching, items, cache]);
   const options = useQuery({
     queryKey: ['checkout-options'],
     queryFn: () => rpc<Options>('checkout_options'),
@@ -232,6 +252,21 @@ export function CartPage() {
     setBusy(true);
     let id: string | undefined;
     try {
+      const latest = await rpc<CartPrice>('cart_pricing', { p_promo: promo || null });
+      if (
+        latest.total !== price.data.total ||
+        latest.discount !== price.data.discount ||
+        latest.split !== price.data.split ||
+        latest.applied_price_changes
+      ) {
+        await cache.invalidateQueries({ queryKey: ['cart'] });
+        await cache.invalidateQueries({ queryKey: ['services'] });
+        await price.refetch();
+        toast.info(
+          'Cijena ili uvjeti su ažurirani. Pregledajte sažetak i ponovno potvrdite narudžbu.',
+        );
+        return;
+      }
       id = await rpc<string>('checkout_cart_order', {
         p_request: requestId,
         p_title: draft.title,

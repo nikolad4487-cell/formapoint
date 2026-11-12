@@ -67,6 +67,11 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
     }
     assert.equal(url.hostname, 'ai-test.supabase.invalid');
     const table = url.pathname.split('/').at(-1)!;
+    if (table === 'refresh_service_prices') {
+      assert.equal(req.headers.get('authorization'), 'Bearer fixture-public-key');
+      assert.deepEqual(await req.json(), {});
+      return json(0);
+    }
     reads.add(table);
     assert(
       ['rate_limit', 'services', 'site_settings', 'discount_banner', 'service_variants'].includes(

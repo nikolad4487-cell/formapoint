@@ -272,3 +272,54 @@ test('POPUST10 bez serverske nadogradnje ne dopušta potvrdu narudžbe', async (
   await expect(page.getByRole('link', { name: 'SQL nadogradnju 017' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Nastavi na narudžbu' })).toBeDisabled();
 });
+
+test('promjena cijene prije potvrde osvježava sažetak bez stvaranja narudžbe', async ({ page }) => {
+  await workspaceFixture(page, { stripe: true });
+  let changed = false,
+    created = 0;
+  await page.route('**/rest/v1/cart_items**', (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 'price-change-cart',
+          service_id: fixtureOrders[0].user_id,
+          quantity: 1,
+          services: {
+            id: fixtureOrders[0].user_id,
+            name: 'Usluga s novom cijenom',
+            description: 'Provjera cijene',
+            price_cents: changed ? 3500 : 2501,
+            split_enabled: true,
+            split_min_cents: 200,
+          },
+        },
+      ],
+    }),
+  );
+  await page.route('**/rest/v1/rpc/cart_pricing', (route) =>
+    route.fulfill({
+      json: {
+        subtotal: changed ? 3500 : 2501,
+        total: changed ? 3500 : 2501,
+        discount: 0,
+        count: 1,
+        split: true,
+      },
+    }),
+  );
+  await page.route('**/rest/v1/rpc/checkout_cart_order', (route) => {
+    created++;
+    return route.fulfill({ json: fixtureOrders[0].id });
+  });
+  await page.goto('/app/kosarica');
+  await details(page);
+  changed = true;
+  await page.getByRole('button', { name: 'Potvrdi i nastavi na sigurnu naplatu' }).click();
+  await expect(
+    page.getByText(
+      'Cijena ili uvjeti su ažurirani. Pregledajte sažetak i ponovno potvrdite narudžbu.',
+    ),
+  ).toBeVisible();
+  await expect(page.locator('.cart-total')).toContainText('35,00');
+  expect(created).toBe(0);
+});
