@@ -2379,3 +2379,54 @@ input[type='file'] {
 .work-delivery-upload p {
   margin-block: 14px;
 }
+
+/* Poveznice koje vlasnik uključuje popunjavanjem postavki. */
+.footer-social {
+  margin-top: 22px;
+}
+.footer-social-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.footer-social-icons a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  color: var(--primary);
+  background: #fff;
+}
+.footer-social-icons a:hover {
+  background: #edf1ff;
+}
+.footer-social a:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+.whatsapp-community {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 46px;
+  max-width: 100%;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 13px;
+  background: #087c48;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.whatsapp-community svg {
+  flex-shrink: 0;
+}
+.footer-grid .whatsapp-community:hover {
+  background: #06663b;
+  color: white;
+}

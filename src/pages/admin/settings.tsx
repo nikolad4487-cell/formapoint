@@ -74,6 +74,9 @@ export function PlatformSettings() {
           facebook_url: field(data, 'facebook_url'),
           instagram_url: field(data, 'instagram_url'),
           linkedin_url: field(data, 'linkedin_url'),
+          whatsapp_community_url: data.has('whatsapp_community_url')
+            ? field(data, 'whatsapp_community_url')
+            : site?.whatsapp_community_url || '',
           stripe_enabled:
             tab === 'payments'
               ? data.get('stripe_enabled') === 'on'
@@ -105,6 +108,7 @@ export function PlatformSettings() {
         }
         const payload: Record<string, unknown> = { ...values };
         delete payload.payment_icons;
+        if (site?.whatsapp_community_url === undefined) delete payload.whatsapp_community_url;
         if (tab === 'payments' && checkoutReady.data === true)
           payload.bank_enabled = data.get('bank_enabled') === 'on';
         const { error } = await requireDb().from('site_settings').update(payload).eq('id', true);
@@ -226,6 +230,36 @@ export function PlatformSettings() {
                       />
                     </label>
                   ))}
+                  <label>
+                    WhatsApp zajednica — pozivna poveznica
+                    <input
+                      name="whatsapp_community_url"
+                      type="url"
+                      placeholder="https://chat.whatsapp.com/…"
+                      maxLength={2000}
+                      defaultValue={site.whatsapp_community_url || ''}
+                      disabled={site.whatsapp_community_url === undefined}
+                    />
+                  </label>
+                  {site.whatsapp_community_url === undefined && (
+                    <p>
+                      Za WhatsApp zajednicu primijenite{' '}
+                      <a
+                        className="text-link"
+                        href="/migracije/202611120018_social_links.sql"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        SQL nadogradnju 018
+                      </a>
+                      , zatim osvježite stranicu.
+                    </p>
+                  )}
+                  <p>
+                    Spremanjem poveznice aktivirate ikonu ili gumb u podnožju javnih stranica.
+                    Brisanjem poveznice i spremanjem uklanjate ih sa stranice. Za WhatsApp
+                    zalijepite pozivnu poveznicu svoje zajednice.
+                  </p>
                   <p>
                     Prazna polja ne prikazuju se posjetiteljima. Za izvoz logotipa otvorite{' '}
                     <Link className="text-link" to="/admin/vizualni-identitet">

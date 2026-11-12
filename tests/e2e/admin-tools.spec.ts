@@ -444,3 +444,74 @@ test('javne putanje po kategoriji otvaraju pravi artikl s istom oznakom', async 
     page.getByRole('link', { name: 'Saznaj više: Izrada završnog rada' }),
   ).toHaveAttribute('href', '/zavrsni-rad/izrada');
 });
+
+test('društvene poveznice aktiviraju ikone i WhatsApp zajednicu te se mogu ukloniti', async ({
+  page,
+}, testInfo) => {
+  await page.route('**/rest/v1/rpc/discount_banner', (route) =>
+    route.fulfill({
+      json: {
+        code: 'POPUST10',
+        name: 'Popust 10%',
+        kind: 'percent',
+        value: 10,
+        first_order_only: true,
+        payment_restriction: 'card_full',
+      },
+    }),
+  );
+  await page.goto('/admin/postavke');
+  await page.getByLabel('Facebook URL').fill('https://www.facebook.com/formapoint-test');
+  await page.getByLabel('Instagram URL').fill('https://www.instagram.com/formapoint-test/');
+  await page
+    .getByLabel('WhatsApp zajednica — pozivna poveznica')
+    .fill('https://chat.whatsapp.com/FormaPointTestInvite');
+  const save = page.waitForRequest(
+    (r) => r.method() === 'PATCH' && r.url().includes('/site_settings'),
+  );
+  await page.getByRole('button', { name: 'Spremi opće postavke' }).click();
+  expect((await save).postDataJSON()).toMatchObject({
+    facebook_url: 'https://www.facebook.com/formapoint-test',
+    instagram_url: 'https://www.instagram.com/formapoint-test/',
+    whatsapp_community_url: 'https://chat.whatsapp.com/FormaPointTestInvite',
+  });
+  await page.goto('/');
+  await expect(page.locator('.discount-banner > span')).toHaveText(
+    'Popust 10% na prvu narudžbu - vrijedi samo za jednokratno kartično plaćanje',
+  );
+  const footer = page.getByRole('contentinfo');
+  await expect(footer.getByRole('link', { name: 'Facebook', exact: true })).toHaveAttribute(
+    'href',
+    'https://www.facebook.com/formapoint-test',
+  );
+  await expect(
+    footer.getByRole('link', { name: 'Instagram', exact: true }).locator('svg'),
+  ).toBeVisible();
+  await expect(
+    footer.getByRole('link', { name: 'Pridruži se WhatsApp zajednici' }),
+  ).toHaveAttribute('href', 'https://chat.whatsapp.com/FormaPointTestInvite');
+  await footer.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `/tmp/formapoint-social-links-${testInfo.project.name}.png` });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.goto('/admin/postavke');
+  await page.getByRole('button', { name: 'Uplate i pravila' }).click();
+  const paymentSave = page.waitForRequest(
+    (r) => r.method() === 'PATCH' && r.url().includes('/site_settings'),
+  );
+  await page.getByRole('button', { name: 'Spremi plaćanje i pravila' }).click();
+  expect((await paymentSave).postDataJSON()).toMatchObject({
+    whatsapp_community_url: 'https://chat.whatsapp.com/FormaPointTestInvite',
+    facebook_url: 'https://www.facebook.com/formapoint-test',
+  });
+  await page.getByRole('button', { name: 'Opće postavke' }).click();
+  await page.getByLabel('Facebook URL').fill('');
+  await page.getByLabel('Instagram URL').fill('');
+  await page.getByLabel('WhatsApp zajednica — pozivna poveznica').fill('');
+  const remove = page.waitForResponse(
+    (r) => r.request().method() === 'PATCH' && r.url().includes('/site_settings'),
+  );
+  await page.getByRole('button', { name: 'Spremi opće postavke' }).click();
+  await remove;
+  await page.goto('/');
+  await expect(page.locator('.footer-social')).toHaveCount(0);
+});

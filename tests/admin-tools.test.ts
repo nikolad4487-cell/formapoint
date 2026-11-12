@@ -26,8 +26,10 @@ describe('administratorske postavke', () => {
       'javascript:alert(1)',
       'http://example.invalid',
       'https://user:password@example.invalid',
-    ])
+    ]) {
       expect(siteSchema.safeParse({ ...site, instagram_url: url }).success).toBe(false);
+      expect(siteSchema.safeParse({ ...site, whatsapp_community_url: url }).success).toBe(false);
+    }
     expect(
       siteSchema.safeParse({ ...site, instagram_url: 'https://example.invalid/profil' }).success,
     ).toBe(true);

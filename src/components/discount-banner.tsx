@@ -25,10 +25,17 @@ export function DiscountBanner() {
   return (
     <div className="discount-banner">
       <span>
-        {offer.name} · {offer.kind === 'percent' ? `${offer.value} %` : money(offer.value)} popusta
-        {offer.first_order_only ? ' za prvu narudžbu' : ''}
-        {(offer.payment_restriction === 'card_full' || offer.code.toUpperCase() === 'POPUST10') &&
-          ' · Samo jednokratno karticom; ne vrijedi za 50/50 ni IBAN'}
+        {offer.code.toUpperCase() === 'POPUST10' && offer.kind === 'percent' ? (
+          `Popust ${offer.value}% na prvu narudžbu - vrijedi samo za jednokratno kartično plaćanje`
+        ) : (
+          <>
+            {offer.name} · {offer.kind === 'percent' ? `${offer.value} %` : money(offer.value)}{' '}
+            popusta
+            {offer.first_order_only ? ' za prvu narudžbu' : ''}
+            {offer.payment_restriction === 'card_full' &&
+              ' - vrijedi samo za jednokratno kartično plaćanje'}
+          </>
+        )}
       </span>
       <button
         onClick={() =>

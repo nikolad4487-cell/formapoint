@@ -101,6 +101,7 @@ export async function workspaceFixture(
         facebook_url: '',
         instagram_url: '',
         linkedin_url: '',
+        whatsapp_community_url: null,
         payment_icons: {},
         cancellation_days: null,
         final_payment_days: null,

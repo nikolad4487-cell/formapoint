@@ -10,6 +10,7 @@ export interface SiteSettings {
   facebook_url?: string | null;
   instagram_url?: string | null;
   linkedin_url?: string | null;
+  whatsapp_community_url?: string | null;
   payment_icons?: Record<string, string>;
   cancellation_days?: number | null;
   final_payment_days?: number | null;
@@ -120,6 +121,7 @@ export const siteSchema = z.object({
   facebook_url: https,
   instagram_url: https,
   linkedin_url: https,
+  whatsapp_community_url: https.optional(),
   cancellation_days: z.number().int().min(0).max(365).nullable(),
   final_payment_days: z.number().int().min(1).max(365).nullable(),
   policies_approved: z.boolean(),

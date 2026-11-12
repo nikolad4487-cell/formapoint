@@ -1,4 +1,5 @@
 import { useSiteSettings, usePublishedPage } from '../hooks/use-site-settings';
+import { SocialLinks } from './social-links';
 import { DiscountBanner } from './discount-banner';
 import { SupportCard } from './brand';
 import { useEffect, useRef, useState } from 'react';
@@ -97,6 +98,7 @@ export function PublicFooter() {
             svakodnevne digitalne zadatke.
           </p>
           <span className="footer-tag">Manje obaveza. Više mogućnosti.</span>
+          <SocialLinks />
         </div>
         <div>
           <h4>Platforma</h4>
@@ -119,19 +121,6 @@ export function PublicFooter() {
           {site?.contact_phone && (
             <a href={`tel:${site.contact_phone.replace(/[^+0-9]/g, '')}`}>{site.contact_phone}</a>
           )}
-          {(
-            [
-              ['Facebook', site?.facebook_url],
-              ['Instagram', site?.instagram_url],
-              ['LinkedIn', site?.linkedin_url],
-            ] as const
-          )
-            .filter(([, url]) => url)
-            .map(([label, url]) => (
-              <a key={label} href={url!} target="_blank" rel="noopener noreferrer">
-                {label}
-              </a>
-            ))}
         </div>
         <div>
           <h4>Pravne informacije</h4>

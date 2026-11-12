@@ -71,6 +71,7 @@ try {
           '202610260015_scheduled_promotions.sql',
           '202610260016_birthday_promotions.sql',
           '202611100017_coupon_payment_rules.sql',
+          '202611120018_social_links.sql',
         ].includes(file)
           ? `public/migracije/${file}`
           : `supabase/migrations/${file}`,
@@ -78,9 +79,11 @@ try {
       ),
     );
     if (
-      ['202610260016_birthday_promotions.sql', '202611100017_coupon_payment_rules.sql'].includes(
-        file,
-      )
+      [
+        '202610260016_birthday_promotions.sql',
+        '202611100017_coupon_payment_rules.sql',
+        '202611120018_social_links.sql',
+      ].includes(file)
     )
       sql(readFileSync(`public/migracije/${file}`, 'utf8'));
     console.log(`Migracija: ${file}`);
