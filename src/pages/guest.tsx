@@ -40,7 +40,11 @@ export function GuestPage() {
             const service = params.get('service');
             if (service) {
               const quantity = Number(params.get('quantity') || 1);
-              await rpc('cart_add', { p_service: service, p_quantity: quantity });
+              await rpc(params.get('package') ? 'cart_add_variant' : 'cart_add', {
+                p_service: service,
+                p_quantity: quantity,
+                ...(params.get('package') ? { p_variant: params.get('package') } : {}),
+              });
             }
             await cache.invalidateQueries();
             const from = location.state?.from;

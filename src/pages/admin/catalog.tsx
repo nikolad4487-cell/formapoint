@@ -1,3 +1,4 @@
+import { ServicePackagesEditor } from '../../components/service-packages';
 import { DeleteCatalogItem } from '../../components/delete-catalog-item';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -19,6 +20,7 @@ import { money } from '../../lib/utils';
 export function CatalogAdmin() {
   const categories = useRows<{ id: string; name: string }>('service_categories');
   const services = useRows<Service>('services');
+  const [packagesFor, setPackagesFor] = useState<Service | null>(null);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Service | undefined>();
   const [category, setCategory] = useState('');
@@ -38,6 +40,21 @@ export function CatalogAdmin() {
         }
       />
       <SearchInput value={search} onChange={setSearch} placeholder="Pretraži kategorije i usluge" />
+      <ConfirmationDialog
+        open={!!packagesFor}
+        onOpenChange={(open) => {
+          if (!open) setPackagesFor(null);
+        }}
+        title={packagesFor ? `Paketi: ${packagesFor.name}` : 'Paketi usluge'}
+      >
+        {packagesFor && (
+          <ServicePackagesEditor
+            key={packagesFor.id}
+            service={packagesFor}
+            done={() => setPackagesFor(null)}
+          />
+        )}
+      </ConfirmationDialog>
       <AdminData query={categories}>
         <AdminData query={services}>
           {categories.data?.length ? (
@@ -99,7 +116,11 @@ export function CatalogAdmin() {
                                 </span>
                               </td>
                               <td>
-                                {s.price_cents === null ? 'Prema ponudi' : money(s.price_cents)}
+                                {s.packages_enabled
+                                  ? 'Više paketa'
+                                  : s.price_cents === null
+                                    ? 'Prema ponudi'
+                                    : money(s.price_cents)}
                               </td>
                               <td>{s.split_enabled ? '100 % ili 50/50' : '100 %'}</td>
                               <td>
@@ -117,6 +138,13 @@ export function CatalogAdmin() {
                                     }}
                                   >
                                     Uredi
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPackagesFor(s)}
+                                  >
+                                    Paketi
                                   </Button>
                                   <DeleteCatalogItem id={s.id} name={s.name} />
                                 </div>

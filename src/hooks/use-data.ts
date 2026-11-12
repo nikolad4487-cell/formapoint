@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { db, requireDb } from '../lib/supabase';
 import { catalog } from '../lib/catalog';
-import type { Service } from '../lib/domain';
+import type { Service, ServicePackage } from '../lib/domain';
 export function useServices() {
   return useQuery({
     queryKey: ['services'],
@@ -13,8 +13,33 @@ export function useServices() {
         .eq('active', true)
         .order('sort_order');
       if (error) throw error;
+      const enabledIds = data.filter((s) => s.packages_enabled).map((s) => s.id);
+      let packages: ServicePackage[] = [];
+      if (enabledIds.length) {
+        const variants = await db
+          .from('service_variants')
+          .select('*')
+          .in('service_id', enabledIds)
+          .eq('active', true)
+          .eq('archived', false)
+          .order('sort_order');
+        if (variants.error) throw variants.error;
+        packages = variants.data as ServicePackage[];
+      }
       return data.map(({ service_categories, ...service }) => ({
         ...service,
+        packages: packages.filter((p) => p.service_id === service.id),
+        ...(service.packages_enabled
+          ? {
+              price_cents: packages.filter((p) => p.service_id === service.id).length
+                ? Math.min(
+                    ...packages
+                      .filter((p) => p.service_id === service.id)
+                      .map((p) => p.price_cents),
+                  )
+                : null,
+            }
+          : {}),
         category_slug: service_categories?.slug,
       })) as Service[];
     },

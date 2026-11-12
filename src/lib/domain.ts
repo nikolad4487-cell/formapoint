@@ -28,7 +28,20 @@ export const statuses: Record<OrderStatus, string> = {
   completed: 'Završeno',
   cancelled: 'Otkazano',
 };
+export interface ServicePackage {
+  id: string;
+  service_id: string;
+  name: string;
+  description: string;
+  price_cents: number;
+  period: string;
+  active: boolean;
+  archived: boolean;
+  sort_order: number;
+}
 export interface Service {
+  packages_enabled?: boolean;
+  packages?: ServicePackage[];
   category_slug?: string;
   id: string;
   slug: string;
@@ -66,6 +79,8 @@ export interface Order {
   created_at: string;
 }
 export interface CartItem {
+  variant_id?: string | null;
+  service_variants?: ServicePackage | null;
   id: string;
   service_id: string;
   quantity: number;

@@ -9,6 +9,8 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
     empty = false;
   let providerCalls = 0;
   let payload: any;
+  let packages: any[] = [];
+  let packagesUnavailable = false;
   let offerError = false;
   let publicOffer: any = {
     code: 'POPUST10',
@@ -66,7 +68,17 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
     assert.equal(url.hostname, 'ai-test.supabase.invalid');
     const table = url.pathname.split('/').at(-1)!;
     reads.add(table);
-    assert(['rate_limit', 'services', 'site_settings', 'discount_banner'].includes(table));
+    assert(
+      ['rate_limit', 'services', 'site_settings', 'discount_banner', 'service_variants'].includes(
+        table,
+      ),
+    );
+    if (table === 'service_variants') {
+      assert.equal(req.headers.get('authorization'), 'Bearer fixture-public-key');
+      assert.equal(url.searchParams.get('active'), 'eq.true');
+      assert.equal(url.searchParams.get('archived'), 'eq.false');
+      return packagesUnavailable ? json({ message: 'Unavailable packages' }, 500) : json(packages);
+    }
     if (table === 'discount_banner') {
       assert.equal(req.headers.get('apikey'), 'fixture-public-key');
       assert.equal(req.headers.get('authorization'), 'Bearer fixture-public-key');
@@ -79,6 +91,7 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
       assert.equal(url.searchParams.get('active'), 'eq.true');
       return json([
         {
+          id: 'package-test-service',
           name: 'Word dokumenti',
           description: 'Formatiranje dokumenta',
           price_cents: 2500,
@@ -150,6 +163,7 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
       assert.deepEqual([...reads].sort(), [
         'discount_banner',
         'rate_limit',
+        'service_variants',
         'services',
         'site_settings',
       ]);
@@ -233,6 +247,44 @@ Deno.test('AI asistent koristi samo javne podatke i ograničava pozive pružatel
         );
         assert(!JSON.stringify(payload).includes('PRIVATE_OFFER_ERROR'));
         offerError = false;
+      },
+    );
+    await t.step(
+      'paketi daju vlastite cijene u eurima bez obećanja automatske obnove',
+      async () => {
+        packages = [
+          {
+            service_id: 'package-test-service',
+            name: 'Mjesečni paket',
+            description: 'Upravljanje e-poštom',
+            period: 'month',
+            price_cents: 35000,
+          },
+        ];
+        await request();
+        const context = JSON.parse(
+          payload.systemInstruction.parts[0].text.split('JAVNI PODACI: ')[1],
+        );
+        assert.equal(context.services[0].packages[0].name, 'Mjesečni paket');
+        assert(context.services[0].packages[0].price.includes('350,00'));
+        assert.equal(context.services[0].price, 'Odaberite paket prema pripadajućoj cijeni');
+        assert(payload.systemInstruction.parts[0].text.includes('bez automatske obnove'));
+        packages = [];
+      },
+    );
+    await t.step(
+      'nedostupni paketi ne pretvaraju osnovnu cijenu u potvrđenu cijenu paketa',
+      async () => {
+        packagesUnavailable = true;
+        await request();
+        const context = JSON.parse(
+          payload.systemInstruction.parts[0].text.split('JAVNI PODACI: ')[1],
+        );
+        assert.equal(
+          context.services[0].price,
+          'Cijenu provjerite na stranici usluge ili u košarici',
+        );
+        packagesUnavailable = false;
       },
     );
     await t.step('ograničenje zaustavlja trošak prije pružatelja', async () => {

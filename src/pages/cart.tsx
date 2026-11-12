@@ -136,10 +136,30 @@ export function CartPage() {
         .select('*,services(*)')
         .order('created_at');
       if (error) throw error;
-      return data as CartItem[];
+      const rows = data as CartItem[];
+      const ids = rows.flatMap((item) => (item.variant_id ? [item.variant_id] : []));
+      if (!ids.length) return rows;
+      const variants = await requireDb().from('service_variants').select('*').in('id', ids);
+      if (variants.error) throw variants.error;
+      return rows.map((item) => ({
+        ...item,
+        service_variants: variants.data.find((p) => p.id === item.variant_id) || null,
+      })) as CartItem[];
     },
   });
-  const items = cart.data || [];
+  const items = (cart.data || []).map((item) =>
+    item.variant_id && item.services
+      ? {
+          ...item,
+          services: {
+            ...item.services,
+            name: `${item.services.name} — ${item.service_variants?.name || 'Paket nije dostupan'}`,
+            description: item.service_variants?.description || '',
+            price_cents: item.service_variants?.price_cents ?? null,
+          },
+        }
+      : item,
+  );
   const price = useQuery({
     queryKey: [
       'cart-price',
@@ -195,7 +215,11 @@ export function CartPage() {
   async function change(item: CartItem, quantity: number) {
     setBusy(true);
     try {
-      await rpc('cart_set', { p_service: item.service_id, p_quantity: quantity });
+      await rpc(item.variant_id ? 'cart_set_variant' : 'cart_set', {
+        p_service: item.service_id,
+        p_quantity: quantity,
+        ...(item.variant_id ? { p_variant: item.variant_id } : {}),
+      });
       await cache.invalidateQueries({ queryKey: ['cart'] });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Izmjena nije uspjela.');

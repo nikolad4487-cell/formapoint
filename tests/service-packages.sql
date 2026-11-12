@@ -1,0 +1,51 @@
+reset role;
+insert into auth.users(id,email,email_confirmed_at)values('b1900000-0000-4000-8000-000000000001','package-one@example.invalid',now()),('b1900000-0000-4000-8000-000000000002','package-two@example.invalid',now());
+insert into public.service_categories(name,slug)values('Paketi test','paketi-test');
+insert into public.services(name,slug,description,category,price_cents,split_enabled,split_min_cents)values('Upravljanje i vođenje e-pošte','paketi-email','Upravljanje e-poštom','Paketi test',5000,true,10000)returning id as package_service \gset
+insert into public.services(name,slug,description,category,price_cents)values('Druga usluga paketa','paketi-druga','Opis druge usluge','Paketi test',2000)returning id as package_other \gset
+set role authenticated;select set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',false);
+select public.save_service_packages(:'package_service',true,'[{"id":"b1900000-0000-4000-8000-000000000011","name":"Paket 1","description":"Jednokratno 4h tjedno","price_cents":7000,"period":"one_time","active":true},{"id":"b1900000-0000-4000-8000-000000000012","name":"Paket 2","description":"5h tjedno","price_cents":9000,"period":"week","active":true},{"id":"b1900000-0000-4000-8000-000000000013","name":"Paket 3","description":"Mjesečno upravljanje","price_cents":35000,"period":"month","active":true}]');
+select pg_temp.expect_error(format('select public.save_service_packages(%L,true,''[]'')',:'package_service'),'Usluga s paketima mora imati aktivan paket');
+reset role;set role anon;
+select pg_temp.assert_true((select count(*)=3 from public.service_variants where service_id=:'package_service'),'Posjetitelj vidi samo javne aktivne pakete');
+reset role;set role authenticated;select set_config('request.jwt.claim.sub','b1900000-0000-4000-8000-000000000001',false);
+select pg_temp.expect_error(format('select public.save_service_packages(%L,false,''[]'')',:'package_service'),'Kupac ne mijenja pakete i cijene');
+select pg_temp.expect_error(format('insert into public.service_variants(service_id,name,price_cents)values(%L,''Lažni paket'',100)',:'package_service'),'Nema izravnog stvaranja paketa iz korisničkog API-ja');
+select pg_temp.expect_error(format('select public.cart_add(%L,1)',:'package_service'),'Usluga s paketima ne može se kupiti po osnovnoj cijeni');
+select pg_temp.expect_error(format('select public.cart_add_variant(%L,''b1900000-0000-4000-8000-000000000011'',1)',:'package_other'),'Paket druge usluge odbija se na poslužitelju');
+select public.cart_add_variant(:'package_service','b1900000-0000-4000-8000-000000000011',1);
+select public.cart_add_variant(:'package_service','b1900000-0000-4000-8000-000000000012',1);
+select public.cart_add_variant(:'package_service','b1900000-0000-4000-8000-000000000011',1);
+select public.cart_set(:'package_service',0);
+select pg_temp.assert_true((select count(*)=2 from public.cart_items),'Dva paketa iste usluge ostaju odvojeni u košarici');
+select pg_temp.assert_true((public.cart_pricing(null)->>'subtotal')::integer=23000,'Cijena se računa iz odabranih paketa, a ne iz osnovne usluge');
+select pg_temp.assert_true(not(public.cart_pricing(null)->>'split')::boolean,'Svi paketi moraju zadovoljiti minimum za 50/50');
+reset role;update public.services set split_min_cents=200 where id=:'package_service';
+insert into public.promo_codes(code,kind,value,max_uses,expires_at,service_id)values('POPUST10','percent',10,100,now()+interval'30 days',:'package_service');
+set role authenticated;select set_config('request.jwt.claim.sub','b1900000-0000-4000-8000-000000000001',false);
+select pg_temp.assert_true((public.cart_pricing(null)->>'split')::boolean,'Paketi nasljeđuju omogućeni 50/50 usluge');
+select pg_temp.assert_true((public.cart_pricing('POPUST10')->>'total')::integer=20700 and not(public.cart_pricing('POPUST10')->>'split')::boolean,'Kupon za uslugu pravilno popušta pakete i zadržava pravilo jednokratne kartice');
+select pg_temp.expect_error(format('select public.create_order(%L,1,''Zaobilaženje paketa'',''Detaljne upute zadatka'',null,''full'',null)',:'package_service'),'Stari tok ne može zaobići odabir paketa');
+select public.checkout_cart_order(gen_random_uuid(),'Paketi e-pošte','Detaljne upute za odabrane pakete',now()+interval'2 day','card','full','{"course":"E-pošta"}','POPUST10')as package_order \gset
+select pg_temp.assert_true((select total_cents=20700 and paid_cents=0 from public.orders where id=:'package_order'),'Narudžba naplaćuje točan zbroj odabranih paketa s popustom');
+select pg_temp.assert_true((select count(*)=2 and sum(unit_cents*quantity)=23000 and bool_and(variant_name is not null and variant_description is not null and variant_period is not null)from public.order_items where order_id=:'package_order'),'Narudžba čuva nazive, cijene, opseg i razdoblje paketa');
+select set_config('request.jwt.claim.sub','b1900000-0000-4000-8000-000000000002',false);
+select public.cart_add_variant(:'package_service','b1900000-0000-4000-8000-000000000012',1);
+select set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',false);
+select public.save_service_packages(:'package_service',true,'[{"id":"b1900000-0000-4000-8000-000000000011","name":"Paket 1 nov naziv","price_cents":8000,"period":"one_time","active":true},{"id":"b1900000-0000-4000-8000-000000000013","name":"Paket 3","price_cents":35000,"period":"month","active":true}]');
+select pg_temp.assert_true((select unit_cents=7000 and variant_name='Paket 1'from public.order_items where order_id=:'package_order'and variant_id='b1900000-0000-4000-8000-000000000011'),'Promjena cijene i naziva ne mijenja već potvrđenu stavku');
+select set_config('request.jwt.claim.sub','b1900000-0000-4000-8000-000000000002',false);
+select pg_temp.expect_error('select public.cart_pricing(null)','Uklonjeni paket u staroj košarici ne naplaćuje se kao osnovna usluga');
+select public.cart_set_variant(:'package_service','b1900000-0000-4000-8000-000000000012',0);
+select pg_temp.assert_true((select count(*)=0 from public.cart_items),'Uklonjeni paket može se ukloniti iz košarice');
+reset role;
+insert into auth.users(id,is_anonymous)values('b1900000-0000-4000-8000-000000000003',true);
+set role authenticated;select set_config('request.jwt.claim.sub','b1900000-0000-4000-8000-000000000003',false);
+select public.save_guest_contact('Gost','Paketi','guest-packages@example.invalid',true);
+select public.cart_add_variant(:'package_service','b1900000-0000-4000-8000-000000000013',1);
+select public.checkout_cart_order(gen_random_uuid(),'Gost mjesečni paket','Detaljne upute za mjesečni paket',now()+interval'2 day','bank','full','{"course":"E-pošta"}',null)as guest_package_order \gset
+select pg_temp.assert_true((select total_cents=35000 and checkout_details->>'guest_email'='guest-packages@example.invalid'from public.orders where id=:'guest_package_order'),'Kupnja mjesečnog paketa kao gost čuva jednu uplatu i kontakt');
+select set_config('request.jwt.claim.sub','33333333-3333-4333-8333-333333333333',false);
+select public.admin_delete_service(:'package_service');
+reset role;
+select pg_temp.assert_true((select count(*)=2 and sum(unit_cents*quantity)=23000 and bool_and(variant_id is null and service_id is null and variant_name is not null)from public.order_items where order_id=:'package_order'),'Brisanje cijele usluge čuva povijest i cijene naručenih paketa');

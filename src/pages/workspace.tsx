@@ -681,6 +681,8 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
     name: string;
     quantity: number;
     unit_cents: number | null;
+    variant_description?: string | null;
+    variant_period?: string | null;
   }>('order_items', { order_id: id! }, 'name');
   const history = useRows<{ id: string; status: string; created_at: string }>(
     'order_status_history',
@@ -720,6 +722,19 @@ export function OrderDetailPage({ admin = false }: { admin?: boolean }) {
                   <li key={item.id}>
                     <span>
                       {item.quantity} × {item.name}
+                      {item.variant_description && (
+                        <small style={{ display: 'block' }}>{item.variant_description}</small>
+                      )}
+                      {item.variant_period && (
+                        <small style={{ display: 'block' }}>
+                          {item.variant_period === 'week'
+                            ? 'Tjedni paket'
+                            : item.variant_period === 'month'
+                              ? 'Mjesečni paket'
+                              : 'Jednokratno'}{' '}
+                          — jednokratna kupnja bez automatske obnove
+                        </small>
+                      )}
                     </span>
                     <strong>
                       {item.unit_cents === null
@@ -2114,6 +2129,10 @@ export function ServiceEditor({
         Nije uključeno (jedna stavka po retku)
         <textarea name="excluded" defaultValue={service?.excluded.join('\n')} />
       </label>
+      <p>
+        Za više paketa spremite uslugu, zatim u popisu usluga odaberite „Paketi”. Cijena ispod
+        vrijedi kada paketi nisu uključeni.
+      </p>
       <label>
         Cijena (€; prazno za individualnu ponudu)
         <EuroInput name="price" defaultCents={service?.price_cents} />

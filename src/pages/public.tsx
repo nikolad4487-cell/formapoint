@@ -1,3 +1,4 @@
+import { ServicePackageChoices } from '../components/service-packages';
 import { categorySlug, servicePath } from '../lib/service-links';
 import { AddToCartButton } from '../components/add-to-cart';
 import { usePublishedPage } from '../hooks/use-site-settings';
@@ -408,7 +409,13 @@ export function ServiceDetail() {
         </div>
         <aside className="price-card">
           <span className="eyebrow">VAŠ SLJEDEĆI PROJEKT</span>
-          <h2>{s.price_cents === null ? 'Cijena prema ponudi' : money(s.price_cents)}</h2>
+          <h2>
+            {s.packages_enabled
+              ? 'Odaberite paket usluge'
+              : s.price_cents === null
+                ? 'Cijena prema ponudi'
+                : money(s.price_cents)}
+          </h2>
           <p>
             {s.price_cents === null
               ? 'Pošaljite opis zadatka i dobit ćete individualnu ponudu.'
@@ -430,7 +437,11 @@ export function ServiceDetail() {
               </li>
             )}
           </ul>
-          <AddToCartButton service={s} />
+          {s.packages_enabled ? (
+            <ServicePackageChoices service={s} />
+          ) : (
+            <AddToCartButton service={s} />
+          )}
           <small>Bez naplate prije potvrde uvjeta.</small>
         </aside>
       </div>
