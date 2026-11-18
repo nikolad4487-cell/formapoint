@@ -3,5 +3,29 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "functions": {
+    "api/seo.mjs": {
+      "includeFiles": "{dist/index.html,src/lib/{catalog,public-faqs,seo,service-links,supabase-config}.ts}"
+    }
+  },
+  "routes": [
+    {
+      "src": "/",
+      "dest": "/api/seo?__seo_path=/"
+    },
+    {
+      "src": "/index.html",
+      "headers": {
+        "Location": "/"
+      },
+      "status": 308
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/seo?__seo_path=/$1"
+    }
+  ]
 }

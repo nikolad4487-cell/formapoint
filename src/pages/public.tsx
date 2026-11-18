@@ -5,7 +5,7 @@ import { usePublishedPage } from '../hooks/use-site-settings';
 import { PublishedText } from './content';
 import { WorkspaceIllustration, BrandBenefit } from '../components/brand';
 import { PaymentMethods } from '../components/payment-methods';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import {
   ArrowRight,
@@ -36,28 +36,8 @@ import {
   ServiceIcon,
 } from '../components/common';
 import { money } from '../lib/utils';
-export const faqs = [
-  [
-    'Kako mogu naručiti uslugu?',
-    'Odaberite uslugu, opišite zadatak i priložite potrebne datoteke. Za individualne zadatke prvo dobivate ponudu s cijenom i rokom.',
-  ],
-  [
-    'Mogu li platiti u dva dijela?',
-    'Model 50/50 dostupan je samo za usluge i ponude za koje je uključen. Prvu polovicu plaćate prije početka rada, a ostatak prije preuzimanja završnih datoteka.',
-  ],
-  [
-    'Jesu li moji dokumenti sigurni?',
-    'Datoteke se pohranjuju privatno. Pristup imaju samo vlasnik narudžbe i ovlaštene osobe, uz provjeru prava na poslužitelju.',
-  ],
-  [
-    'Što ako ne znam koju uslugu odabrati?',
-    'Pošaljite individualni zahtjev s opisom zadatka. Nakon procjene dobit ćete ponudu bez obveze trenutnog plaćanja.',
-  ],
-  [
-    'Mogu li zatražiti izmjene?',
-    'Broj uključenih revizija naveden je u ponudi. Dodatne izmjene dogovaraju se prije nastavka rada.',
-  ],
-];
+import { faqs } from '../lib/public-faqs';
+import { publicPages } from '../lib/seo';
 export function FAQ({ short = false }: { short?: boolean }) {
   return (
     <div className="faq-list">
@@ -86,14 +66,11 @@ export function HomePage() {
               Vaš partner za digitalne i administrativne usluge
             </span>
             <h1>
-              Digitalne usluge
+              Word dokumenti, PowerPoint
               <br />
-              <span>na jednom mjestu</span>
+              <span>i online administracija</span>
             </h1>
-            <p>
-              Profesionalna izrada i uređivanje dokumenata, prezentacija, obrazaca i
-              administrativnih zadataka – jednostavno, brzo i online.
-            </p>
+            <p>{publicPages['/'].description}</p>
             <div className="hero-actions">
               <LinkButton to="/app/nova-narudzba">Naruči uslugu</LinkButton>
               <Button variant="outline" asChild>
@@ -154,7 +131,7 @@ export function HomePage() {
                 individualnu ponudu.
               </span>
             </div>
-            <Link to="/usluge/individualni-zahtjev">
+            <Link to="/kontakt">
               Pošalji upit <ArrowUpRight size={18} />
             </Link>
           </div>
@@ -354,11 +331,15 @@ export function ServicesPage() {
 export function ServiceDetail() {
   const { slug, categorySlug: category } = useParams();
   const q = useServices();
-  if (q.isPending) return <LoadingSkeleton />;
-  if (q.isError) return <ErrorState retry={() => void q.refetch()} />;
   const matches = (q.data || []).filter(
     (service) => service.slug === slug && (!category || categorySlug(service) === category),
   );
+  const serviceName = matches.length === 1 ? matches[0].name : undefined;
+  useEffect(() => {
+    if (serviceName) document.title = `${serviceName} | FormaPoint`;
+  }, [serviceName]);
+  if (q.isPending) return <LoadingSkeleton />;
+  if (q.isError) return <ErrorState retry={() => void q.refetch()} />;
   if (!matches.length) return <NotFound />;
   if (!category && matches.length > 1)
     return (
@@ -585,6 +566,9 @@ export function InfoPage({ kind }: { kind: string }) {
   );
 }
 export function NotFound() {
+  useEffect(() => {
+    document.title = 'Stranica nije pronađena | FormaPoint';
+  }, []);
   return (
     <div className="container section empty-state">
       <span className="eyebrow">404 · STRANICA NIJE PRONAĐENA</span>

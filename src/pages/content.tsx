@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, ArrowUpRight } from 'lucide-react';
@@ -19,6 +19,10 @@ export function PublishedText({ page }: { page: ContentPage }) {
 export function ContentPageView() {
   const { slug = '' } = useParams();
   const q = usePublishedPage(slug);
+  const title = q.data?.title;
+  useEffect(() => {
+    if (title) document.title = `${title} | FormaPoint`;
+  }, [title]);
   if (q.isFetching)
     return (
       <div className="container section">
