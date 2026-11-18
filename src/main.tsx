@@ -41,6 +41,7 @@ import {
   ReportsPage,
   AdminSupport,
 } from './pages/admin';
+import { publicPages } from './lib/seo';
 import './index.css';
 import './reference.css';
 const queryClient = new QueryClient({
@@ -51,16 +52,15 @@ function NavigationEffects() {
   useEffect(() => {
     window.scrollTo(0, 0);
     const names: Record<string, string> = {
-      '/': 'Digitalne usluge na jednom mjestu',
-      '/usluge': 'Usluge',
       '/prijava': 'Prijava',
       '/registracija': 'Registracija',
       '/app': 'Moj radni prostor',
       '/admin': 'Administracija',
-      '/kontakt': 'Kontakt',
-      '/cjenik': 'Cjenik',
     };
-    document.title = `${names[pathname] || 'Vaš digitalni partner'} | FormaPoint`;
+    const path = (pathname.replace(/\/+$/, '') || '/').toLowerCase();
+    const publicPage = publicPages[path as keyof typeof publicPages];
+    if (publicPage) document.title = publicPage.title;
+    else if (names[path]) document.title = `${names[path]} | FormaPoint`;
   }, [pathname]);
   return null;
 }

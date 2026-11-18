@@ -3,13 +3,14 @@ test('početna stranica i katalog bez konfiguracije', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Digitalne usluge');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Word dokumenti, PowerPoint');
   await page.getByRole('link', { name: 'Pogledaj usluge' }).click();
   await expect(page).toHaveURL(/\/usluge$/);
   await page.getByPlaceholder('Pretražite usluge…').fill('Excel');
   await expect(page.locator('.service-card')).toHaveCount(1);
   await page.getByRole('link', { name: 'Saznaj više: Excel tablice' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Excel tablice');
+  await expect(page).toHaveTitle('Excel tablice | FormaPoint');
   expect(errors).toEqual([]);
 });
 test('nedostupna prijava nema lažni uspjeh', async ({ page }) => {
