@@ -15,6 +15,12 @@ Cijene se čitaju pri zahtjevu nakon poziva javne funkcije `refresh_service_pric
 
 Funkcija koristi isključivo javni Supabase ključ iz postojeće konfiguracije ili para Vercel varijabli `VITE_SUPABASE_URL` i `VITE_SUPABASE_PUBLISHABLE_KEY` (alternativno `VITE_SUPABASE_ANON_KEY`). Nikada ne upisivati service-role ključ u njih. Ne čita korisničke narudžbe, profile, privatne datoteke ili poslovne postavke. Javni podaci u HTML-u služe i za početno punjenje React Queryja.
 
+## Google: potvrda priloženom HTML datotekom
+
+Googleova datoteka `google009c75011ca535f8.html` dodana je u `public/` i pri izgradnji se kopira na korijen stranice. Nakon što Vercel objava dobije status **Ready**, otvori `https://www.formapoint.online/google009c75011ca535f8.html`. Mora prikazati točno `google-site-verification: google009c75011ca535f8.html`.
+
+U Search Consoleu zadrži odabranu potvrdu **HTML datotekom** i klikni **Potvrdi**. Za ovu metodu ne treba postavljati `GOOGLE_SITE_VERIFICATION`. Datoteku zadržati i nakon potvrde jer Google može ponovno provjeravati vlasništvo. Nakon uspješne potvrde u odjeljku **Sitemaps** pošalji `sitemap.xml`.
+
 ## Google: potvrda vlasništva bez DNS-a i bez laptop projekta
 
 1. Otvori [Google Search Console](https://search.google.com/search-console/welcome) i prijavi se svojim Google računom.
