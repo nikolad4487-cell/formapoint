@@ -2,3 +2,15 @@ User-agent: *
 Allow: /
 Disallow: /app
 Disallow: /admin
+Disallow: /api
+Disallow: /prijava
+Disallow: /registracija
+Disallow: /kupnja-kao-gost
+Disallow: /zaboravljena-lozinka
+Disallow: /reset-lozinke
+Disallow: /potvrda-emaila
+Disallow: /odjava-newslettera
+Disallow: /migracije
+Disallow: /dizajn-sustav
+
+Sitemap: https://www.formapoint.online/sitemap.xml

@@ -3,5 +3,36 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "functions": {
+    "api/public.js": {
+      "includeFiles": "dist/index.html"
+    }
+  },
+  "routes": [
+    {
+      "src": "^/$",
+      "dest": "/api/public?path=/"
+    },
+    {
+      "src": "^/(?:app|admin)(?:/.*)?$",
+      "dest": "/index.html",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow"
+      }
+    },
+    {
+      "src": "^/(?:prijava|registracija|kupnja-kao-gost|zaboravljena-lozinka|reset-lozinke|potvrda-emaila|odjava-newslettera|dizajn-sustav)(?:/)?$",
+      "dest": "/index.html",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow"
+      }
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/(.*)$",
+      "dest": "/api/public?path=/$1"
+    }
+  ]
 }

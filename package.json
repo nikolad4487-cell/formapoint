@@ -20,7 +20,9 @@
     "deploy:files": "node scripts/deploy-files.mjs",
     "deploy:stripe": "node scripts/deploy-stripe.mjs",
     "deploy:ai": "node scripts/deploy-ai.mjs",
-    "deploy:promotions": "node scripts/deploy-promotions.mjs"
+    "deploy:promotions": "node scripts/deploy-promotions.mjs",
+    "test:seo": "node --test tests/seo/server.test.mjs",
+    "test:seo:browser": "npm run build && node scripts/test-seo-browser.mjs"
   },
   "engines": {
     "node": ">=22.12"

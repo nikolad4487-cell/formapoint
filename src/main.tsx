@@ -1,3 +1,5 @@
+import { SeoMetadata } from './components/seo-metadata';
+import { seedPublicQueries } from './lib/public-bootstrap';
 import { AIAssistant } from './components/ai-assistant';
 import { GuestPage } from './pages/guest';
 import { CartPage, CatalogOrderPage } from './pages/cart';
@@ -18,7 +20,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './hooks/use-auth';
 import { AppShell, DashboardLayout, ProtectedRoute } from './components/layout';
-import { HomePage, ServicesPage, ServiceDetail, InfoPage, NotFound } from './pages/public';
+import {
+  HomePage,
+  ServicesPage,
+  ServiceDetail,
+  CategoryPage,
+  InfoPage,
+  NotFound,
+} from './pages/public';
 import { AuthPage } from './pages/auth';
 import {
   DashboardPage,
@@ -46,21 +55,11 @@ import './reference.css';
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 15000, retry: 1, refetchOnWindowFocus: false } },
 });
+seedPublicQueries(queryClient);
 function NavigationEffects() {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
-    const names: Record<string, string> = {
-      '/': 'Digitalne usluge na jednom mjestu',
-      '/usluge': 'Usluge',
-      '/prijava': 'Prijava',
-      '/registracija': 'Registracija',
-      '/app': 'Moj radni prostor',
-      '/admin': 'Administracija',
-      '/kontakt': 'Kontakt',
-      '/cjenik': 'Cjenik',
-    };
-    document.title = `${names[pathname] || 'Vaš digitalni partner'} | FormaPoint`;
   }, [pathname]);
   return null;
 }
@@ -87,11 +86,13 @@ function App() {
   return (
     <>
       <NavigationEffects />
+      <SeoMetadata />
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="usluge" element={<ServicesPage />} />
           <Route path="usluge/:slug" element={<ServiceDetail />} />
+          <Route path=":categorySlug" element={<CategoryPage />} />
           <Route path=":categorySlug/:slug" element={<ServiceDetail />} />
           {[
             'cjenik',

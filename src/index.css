@@ -2457,3 +2457,61 @@ input[type='file'] {
 .service-package > .button {
   margin-top: 12px;
 }
+
+.service-preparation {
+  margin-block: 32px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #f8faff;
+}
+.service-preparation h2 {
+  margin-bottom: 16px;
+}
+.service-preparation p {
+  margin-top: 14px;
+}
+.seo-initial .service-grid {
+  margin-block: 28px;
+}
+.seo-initial .service-card {
+  padding: 24px;
+}
+.seo-initial .service-card h2 {
+  font-size: 20px;
+  margin-bottom: 14px;
+}
+.seo-initial details {
+  margin-block: 16px;
+}
+.seo-initial .prose-text {
+  white-space: pre-wrap;
+}
+.seo-initial h2 {
+  margin-top: 28px;
+}
+.seo-initial li {
+  margin-block: 8px;
+}
+.category-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-block: 24px;
+}
+.category-links a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+.seo-initial .header-inner {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.seo-initial nav a {
+  display: inline-block;
+  margin-right: 12px;
+}
+.seo-initial .service-card,
+.seo-initial .service-package {
+  overflow-wrap: anywhere;
+}

@@ -1,3 +1,6 @@
+import { faqs, buySteps } from '../../seo/content.mjs';
+import { ServicePreparation } from '../components/service-preparation';
+import { useSiteSettings } from '../hooks/use-site-settings';
 import { ServicePackageChoices } from '../components/service-packages';
 import { categorySlug, servicePath } from '../lib/service-links';
 import { AddToCartButton } from '../components/add-to-cart';
@@ -36,28 +39,6 @@ import {
   ServiceIcon,
 } from '../components/common';
 import { money } from '../lib/utils';
-export const faqs = [
-  [
-    'Kako mogu naručiti uslugu?',
-    'Odaberite uslugu, opišite zadatak i priložite potrebne datoteke. Za individualne zadatke prvo dobivate ponudu s cijenom i rokom.',
-  ],
-  [
-    'Mogu li platiti u dva dijela?',
-    'Model 50/50 dostupan je samo za usluge i ponude za koje je uključen. Prvu polovicu plaćate prije početka rada, a ostatak prije preuzimanja završnih datoteka.',
-  ],
-  [
-    'Jesu li moji dokumenti sigurni?',
-    'Datoteke se pohranjuju privatno. Pristup imaju samo vlasnik narudžbe i ovlaštene osobe, uz provjeru prava na poslužitelju.',
-  ],
-  [
-    'Što ako ne znam koju uslugu odabrati?',
-    'Pošaljite individualni zahtjev s opisom zadatka. Nakon procjene dobit ćete ponudu bez obveze trenutnog plaćanja.',
-  ],
-  [
-    'Mogu li zatražiti izmjene?',
-    'Broj uključenih revizija naveden je u ponudi. Dodatne izmjene dogovaraju se prije nastavka rada.',
-  ],
-];
 export function FAQ({ short = false }: { short?: boolean }) {
   return (
     <div className="faq-list">
@@ -247,6 +228,9 @@ export function HomePage() {
           </div>
         </div>
       </section>
+      <div className="container">
+        <ServicePreparation />
+      </div>
       <section className="container section faq-section">
         <div>
           <span className="eyebrow">DOBRO JE ZNATI</span>
@@ -260,7 +244,7 @@ export function HomePage() {
             Sva pitanja i odgovori <ArrowRight size={17} />
           </Link>
         </div>
-        <FAQ short />
+        <FAQ />
       </section>
       <section className="container cta-wrap">
         <div className="cta">
@@ -320,17 +304,11 @@ export function ServicesPage() {
         </label>
       </div>
       <div className="filter-tabs">
-        {['Sve usluge', 'Dokumenti', 'Prezentacije', 'Tablice', 'Administracija', 'Ostalo'].map(
-          (c) => (
-            <button
-              key={c}
-              className={category === c ? 'active' : ''}
-              onClick={() => setCategory(c)}
-            >
-              {c}
-            </button>
-          ),
-        )}
+        {['Sve usluge', ...new Set((q.data || []).map((service) => service.category))].map((c) => (
+          <button key={c} className={category === c ? 'active' : ''} onClick={() => setCategory(c)}>
+            {c}
+          </button>
+        ))}
       </div>
       {q.isPending ? (
         <LoadingSkeleton />
@@ -348,6 +326,39 @@ export function ServicesPage() {
           description="Pokušajte drugi pojam ili kategoriju."
         />
       )}
+      <nav className="category-links" aria-label="Kategorije usluga">
+        {[
+          ...new Map((q.data || []).map((service) => [categorySlug(service), service])).values(),
+        ].map((service) => (
+          <Link key={categorySlug(service)} to={`/${categorySlug(service)}`}>
+            {service.category}
+          </Link>
+        ))}
+      </nav>
+      <ServicePreparation />
+    </div>
+  );
+}
+export function CategoryPage() {
+  const { categorySlug: category } = useParams();
+  const q = useServices();
+  if (q.isPending) return <LoadingSkeleton />;
+  if (q.isError) return <ErrorState retry={() => void q.refetch()} />;
+  const services = (q.data || []).filter((service) => categorySlug(service) === category);
+  if (!services.length) return <NotFound />;
+  return (
+    <div className="container section">
+      <Breadcrumbs current={services[0].category} />
+      <PageHeader
+        title={services[0].category}
+        description="Pregledajte opseg, aktualne cijene i pakete te pošaljite upute za svoj zadatak."
+      />
+      <div className="service-grid">
+        {services.map((service) => (
+          <ServiceCard key={service.id} service={service} />
+        ))}
+      </div>
+      <ServicePreparation />
     </div>
   );
 }
@@ -404,8 +415,9 @@ export function ServiceDetail() {
             Upute, rok i konačni opseg potvrđujemo prije početka izrade. Za akademske radove nudimo
             dopuštenu tehničku podršku, formatiranje i lekturu.
           </p>
+          <ServicePreparation service={s} />
           <h2>Česta pitanja</h2>
-          <FAQ short />
+          <FAQ />
         </div>
         <aside className="price-card">
           <span className="eyebrow">VAŠ SLJEDEĆI PROJEKT</span>
@@ -489,6 +501,9 @@ const legal: Record<string, [string, string[]]> = {
 };
 export function InfoPage({ kind }: { kind: string }) {
   const published = usePublishedPage(kind);
+  const catalogue = useServices();
+  const site = useSiteSettings();
+  const provider = usePublishedPage('podaci-pruzatelja');
   if (published.data) return <PublishedText page={published.data} />;
   if (kind === 'faq')
     return (
@@ -509,6 +524,12 @@ export function InfoPage({ kind }: { kind: string }) {
           title="Cijena prilagođena vašem zadatku."
           description="Cijene ovise o opsegu, složenosti i roku. Za konkretan zadatak zatražite ponudu."
         />
+        <div className="service-grid">
+          {catalogue.data?.map((service) => (
+            <ServiceCard key={service.id} service={service} />
+          ))}
+        </div>
+        <ServicePreparation />
         <LinkButton to="/usluge">Pregledaj katalog usluga</LinkButton>
         <div className="notice">
           <LockKeyhole />
@@ -523,15 +544,7 @@ export function InfoPage({ kind }: { kind: string }) {
     return (
       <div className="container narrow section">
         <PageHeader eyebrow="KORAK PO KORAK" title="Jednostavan put do gotovog rada." />
-        {[
-          ['Odaberite uslugu', 'Prijavite se i pošaljite opis zadatka i potrebne datoteke.'],
-          ['Potvrdite ponudu', 'Provjerite opseg, rok, cijenu i model plaćanja.'],
-          ['Pratite izradu', 'Nakon potvrđene početne uplate pratite status i šaljite poruke.'],
-          [
-            'Preuzmite rezultat',
-            'Završne datoteke dostupne su nakon ukupne uplate. Ako iznos nije moguće podijeliti na dvije jednake rate, prva rata može biti veća za 0,01 €.',
-          ],
-        ].map(([t, d], i) => (
+        {buySteps.map(([t, d], i) => (
           <article className="how-step" key={t}>
             <span className="step-number">0{i + 1}</span>
             <div>
@@ -555,8 +568,23 @@ export function InfoPage({ kind }: { kind: string }) {
         <div className="notice">
           <ShieldCheck />
           <p>
-            Poslovni podaci pružatelja bit će objavljeni nakon provjere i konfiguracije. Platforma
-            još nije otvorena za produkcijsko poslovanje.
+            {provider.data ? (
+              <Link to="/p/podaci-pruzatelja">Podaci o pružatelju usluga</Link>
+            ) : (
+              <Link to="/kontakt">
+                Kontaktirajte nas za podatke o pružatelju i dogovor o usluzi.
+              </Link>
+            )}
+            {site.data?.public_contact_email && (
+              <>
+                {' '}
+                Kontakt:{' '}
+                <a href={`mailto:${site.data.public_contact_email}`}>
+                  {site.data.public_contact_email}
+                </a>
+                .
+              </>
+            )}
           </p>
         </div>
         <LinkButton to="/usluge">Upoznajte usluge</LinkButton>

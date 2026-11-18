@@ -21,7 +21,7 @@ export function ServicePackageChoices({ service }: { service: Service }) {
     <div className="service-package-choices">
       <p>Odaberite paket. Svaki paket kupuje se jednom, bez automatske obnove.</p>
       {packages.map((p) => (
-        <article className="service-package" key={p.id}>
+        <article id={`paket-${p.id}`} className="service-package" key={p.id}>
           <h3>{p.name}</h3>
           <span className="badge">{packagePeriods[p.period] || 'Jednokratno'}</span>
           {p.description && <p>{p.description}</p>}

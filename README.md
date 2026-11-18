@@ -105,3 +105,5 @@ Zakazano slanje promocija na početak valjanosti i 30 dana od tog početka: [SQL
 Automatske rođendanske promocije: SQL nadogradnja `public/migracije/202610260016_birthday_promotions.sql` nakon 015, zatim `npm run deploy:promotions`. Korisnik unosi dan i mjesec u Moj profil, administrator sprema godišnje pravilo u Popusti i kuponi. Detalji: [promocije](docs/PERSONALIZIRANE-PROMOCIJE.md).
 
 Automatski cjenik od 1.1.2027.: [aktivacija i pravila rasporeda](docs/CIJENE-OD-2027.md). SQL nadogradnja 020 priprema deset cijena za Hrvatsku i ne mijenja postojeće narudžbe.
+
+Upute za javni HTML, sitemap i potvrdu vlasništva u Googleu/Bingu: [SEO i pretraživači](docs/SEO-I-PRETRAZIVACI.md).

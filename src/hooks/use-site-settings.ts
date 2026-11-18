@@ -19,7 +19,7 @@ export function useSiteSettings() {
 export function usePublishedPage(slug: string) {
   return useQuery({
     queryKey: ['content_pages', 'published', slug],
-    enabled: configured,
+    enabled: configured && Boolean(slug),
     queryFn: async () => {
       const { data, error } = await requireDb()
         .from('content_pages')
