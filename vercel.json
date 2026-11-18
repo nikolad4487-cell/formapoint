@@ -5,7 +5,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/seo.mjs": {
-      "includeFiles": "dist/index.html"
+      "includeFiles": "{dist/index.html,src/lib/{catalog,public-faqs,seo,service-links,supabase-config}.ts}"
     }
   },
   "routes": [
