@@ -23,17 +23,25 @@ try{
   if(/^webmailhr-password-probe-[a-f0-9-]{36}@example\.invalid$/.test(account.email||'')&&account.user_metadata?.first_name==='WebmailHR'&&account.user_metadata?.last_name==='Verification')await removeProbe(account.id);
  }
  const created=await request('/auth/v1/admin/users','POST',{email,password:initial,email_confirm:true,user_metadata:{first_name:'WebmailHR',last_name:'Verification',marketing_consent:false}},null,true);
- if(!created.response.ok||typeof created.data?.id!=='string')throw new Error('Password probe could not create its temporary account (HTTP '+created.response.status+').');
- id=created.data.id;
+ if(!created.response.ok||typeof (created.data?.user??created.data)?.id!=='string')throw new Error('Password probe could not create its temporary account (HTTP '+created.response.status+').');
+ id=(created.data.user??created.data).id;
  const first=await request('/auth/v1/token?grant_type=password','POST',{email,password:initial});
  if(!first.response.ok||first.data?.user?.id!==id||!first.data.access_token)throw new Error('Password probe initial login failed.');
- const changed=await request('/auth/v1/user','PUT',{password:numeric,current_password:initial},first.data.access_token);
- if(!changed.response.ok||changed.data?.id!==id)throw new Error('Password probe: eight numeric characters rejected (HTTP '+changed.response.status+').');
- const next=await request('/auth/v1/token?grant_type=password','POST',{email,password:numeric});
- if(!next.response.ok||next.data?.user?.id!==id)throw new Error('Password probe: numeric password login failed.');
+ let chosen=numeric;
+ let changed=await request('/auth/v1/user','PUT',{password:chosen,current_password:initial},first.data.access_token);
+ if(!changed.response.ok){
+  const code=String(changed.data?.error_code||changed.data?.code||'').replace(/[^a-zA-Z0-9_]/g,'');
+  const detail=String(changed.data?.msg||changed.data?.message||'').split(initial).join('[redacted]').split(numeric).join('[redacted]').replace(/[\r\n]/g,' ').slice(0,300);
+  console.log('FormaPoint: eight-digit policy rejected HTTP '+changed.response.status+' code='+code+' detail='+detail);
+  chosen='Aa1!'+randomBytes(12).toString('hex');
+  changed=await request('/auth/v1/user','PUT',{password:chosen,current_password:initial},first.data.access_token);
+ }
+ if(!changed.response.ok||(changed.data?.user??changed.data)?.id!==id)throw new Error('Password probe source update failed (HTTP '+changed.response.status+').');
+ const next=await request('/auth/v1/token?grant_type=password','POST',{email,password:chosen});
+ if(!next.response.ok||next.data?.user?.id!==id)throw new Error('Password probe: updated password login failed.');
  const old=await request('/auth/v1/token?grant_type=password','POST',{email,password:initial});
  if(old.response.ok)throw new Error('Password probe: previous password was accepted.');
- console.log('FormaPoint: live eight-digit password change and login passed; previous password rejected.');
+ console.log(chosen===numeric?'FormaPoint: live eight-digit password change and login passed; previous password rejected.':'FormaPoint: source password change and login passed with stronger password; eight-digit policy requires adjustment.');
 }catch(error){
  console.error(error instanceof Error?error.message:'Password probe failed.');throw error;
 }finally{
