@@ -4,18 +4,64 @@ import type { ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { db } from '../lib/supabase';
 import type { Role } from '../lib/domain';
+import { provisionWebmail, type WebmailMailbox } from '../lib/webmail';
 const AuthContext = createContext<{
   session: Session | null;
   role: Role;
   loading: boolean;
   error: string | null;
-}>({ session: null, role: 'CUSTOMER', loading: true, error: null });
+  webmail: WebmailMailbox | null;
+  webmailLoading: boolean;
+  webmailError: string | null;
+  retryWebmail: () => void;
+}>({
+  session: null,
+  role: 'CUSTOMER',
+  loading: true,
+  error: null,
+  webmail: null,
+  webmailLoading: false,
+  webmailError: null,
+  retryWebmail: () => {},
+});
 export function AuthProvider({ children }: { children: ReactNode }) {
   const cache = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<Role>('CUSTOMER');
   const [loading, setLoading] = useState(Boolean(db));
   const [error, setError] = useState<string | null>(null);
+  const [webmail, setWebmail] = useState<WebmailMailbox | null>(null),
+    [webmailLoading, setWebmailLoading] = useState(false),
+    [webmailError, setWebmailError] = useState<string | null>(null),
+    [webmailRetry, setWebmailRetry] = useState(0);
+  useEffect(() => {
+    setWebmail(null);
+    setWebmailError(null);
+    if (!session?.access_token || session.user.is_anonymous || !session.user.email_confirmed_at) {
+      setWebmailLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setWebmailLoading(true);
+    void provisionWebmail(session.access_token, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setWebmail(result);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setWebmailError('Sandučić trenutačno nije dostupan. Pokušajte ponovno.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setWebmailLoading(false);
+      });
+    return () => controller.abort();
+  }, [
+    session?.user.id,
+    session?.user.is_anonymous,
+    session?.user.email_confirmed_at,
+    session?.access_token,
+    webmailRetry,
+  ]);
   useEffect(() => {
     if (!db) return;
     let alive = true;
@@ -68,7 +114,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [cache]);
   return (
-    <AuthContext.Provider value={{ session, role, loading, error }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        role,
+        loading,
+        error,
+        webmail,
+        webmailLoading,
+        webmailError,
+        retryWebmail: () => setWebmailRetry((x) => x + 1),
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

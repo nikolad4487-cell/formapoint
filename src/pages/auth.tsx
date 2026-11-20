@@ -1,3 +1,4 @@
+import { validSharedPassword, sharedPasswordHint } from '../lib/password';
 import { WorkspaceIllustration, BrandBenefit } from '../components/brand';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -71,9 +72,12 @@ export function AuthPage({
       fieldError('email', { message: 'Unesite ispravnu e-mail adresu.' });
       return;
     }
-    if (passwordMode && v.password.length < (mode === 'login' ? 1 : 8)) {
+    if (
+      passwordMode &&
+      (mode === 'login' ? !v.password.length : !validSharedPassword(v.password))
+    ) {
       fieldError('password', {
-        message: 'Unesite lozinku; nova lozinka treba imati najmanje 8 znakova.',
+        message: mode === 'login' ? 'Unesite lozinku.' : sharedPasswordHint,
       });
       return;
     }
