@@ -26,7 +26,9 @@ nepotvrđene i zabranjene i vraća `nextPage`. Nastavite dok ne bude `null`.
 Odgovor prijavljuje created/existing/conflicts/needsActivation; konflikti se ne prepisuju.
 Pozivi običnih korisnika prihvaćaju samo `{}` i vraćaju isključivo njihov sandučić.
 
-Za vanjski e-mail adresa dobiva stabilan UUID sažetak radi izbjegavanja kolizija;
+Za osobni e-mail adresa se dodjeljuje u obliku ime.prezime@formapoint.online,
+bez kvačica. Zauzeta imena dobivaju broj odmah nakon prezimena: ime.prezime2,
+ime.prezime3 itd. Bez imena i prezimena koristi se lokalni dio osobnog e-maila;
 vlastita nezauzeta adresa na formapoint.online može ostati ista. Postojeći povezani
 račun zadržava svoju adresu i neovisnu WebmailHR lozinku. Za novi račun koristi se
 FormaPoint prijava; WebmailHR provjerava izvorni UUID. Postojeći IMAP sandučići
@@ -39,3 +41,9 @@ sačuvati ih i odobriti prelazak cijele domene. Stare Zoho poruke ne uvoze se ov
 Provjere: `npm run test:webmail`, `npm test`, `npm run build`. Serverski testovi
 provjeravaju HMAC, granicu identiteta, potvrdu računa, privatnost grešaka i uvoz.
 Webmail repo dodatno testira stvarnu PostgreSQL transakciju i prijavu izvornog UUID-a.
+
+WebmailHR može uz `FORMAPOINT_WELCOME_EMAIL=1` poslati jednu obavijest na potvrđenu
+osobnu adresu korištenu pri registraciji. Sadrži novu adresu i uputu da lozinka
+ostaje ona za FormaPoint; lozinka se ne generira niti šalje. WebmailHR koristi
+postojeći Mailjet i trajni red s provjerom ponavljanja. Kvar slanja ne blokira
+registraciju. Uspješna predaja Mailjetu ne potvrđuje dostavu u Gmailov Inbox.

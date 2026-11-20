@@ -1561,7 +1561,10 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
               >
                 Otvori WebmailHR
               </a>
-              <p>Za novi sandučić prijavite se svojim FormaPoint podacima.</p>
+              <p>
+                Za prijavu koristite adresu sandučića i lozinku koju ste postavili za prijavu na
+                FormaPoint.
+              </p>
             </>
           ) : (
             <>
