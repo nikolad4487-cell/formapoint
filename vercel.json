@@ -4,6 +4,9 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
+    "api/webmail-sync.js": {
+      "maxDuration": 60
+    },
     "api/public.js": {
       "includeFiles": "dist/index.html"
     }

@@ -1531,7 +1531,7 @@ export function NotificationsPage() {
   );
 }
 export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
-  const { session } = useAuth();
+  const { session, webmail, webmailLoading, webmailError, retryWebmail } = useAuth();
   const q = useRows<{
     id: string;
     first_name: string;
@@ -1545,6 +1545,36 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
   return (
     <>
       <PageHeader title="Moj profil" embedded={embedded} />
+      {!session?.user.is_anonymous && (
+        <section className="panel">
+          <h2>Osobni sandučić</h2>
+          {webmailLoading ? (
+            <p>Pripremamo vaš sandučić…</p>
+          ) : webmail ? (
+            <>
+              <p>{webmail.address}</p>
+              <a
+                className="button"
+                href={webmail.loginUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Otvori WebmailHR
+              </a>
+              <p>Za novi sandučić prijavite se svojim FormaPoint podacima.</p>
+            </>
+          ) : (
+            <>
+              <p>{webmailError || 'Sandučić se povezuje nakon potvrde e-mail adrese.'}</p>
+              {webmailError && (
+                <button type="button" onClick={retryWebmail}>
+                  Pokušaj ponovno
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      )}
       <QueryState query={q}>
         {q.data?.[0] && (
           <form

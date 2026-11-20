@@ -22,7 +22,8 @@
     "deploy:ai": "node scripts/deploy-ai.mjs",
     "deploy:promotions": "node scripts/deploy-promotions.mjs",
     "test:seo": "node --test tests/seo/server.test.mjs",
-    "test:seo:browser": "npm run build && node scripts/test-seo-browser.mjs"
+    "test:seo:browser": "npm run build && node scripts/test-seo-browser.mjs",
+    "test:webmail": "node --test tests/webmail-sync/*.test.mjs"
   },
   "engines": {
     "node": ">=22.12"
