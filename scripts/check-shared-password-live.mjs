@@ -9,7 +9,19 @@ async function request(path,method,body,token,admin=false){
  const response=await fetch(base+path,{method,redirect:'error',signal:AbortSignal.timeout(12000),headers:{apikey:key,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:admin&&key.startsWith('eyJ')?{Authorization:'Bearer '+key}:{})},...(body?{body:JSON.stringify(body)}:{})});
  const data=await response.json().catch(()=>null);return {response,data};
 }
+async function removeProbe(userId){
+ if(!/^[a-f0-9-]{36}$/.test(userId))throw new Error('Invalid temporary account identifier.');
+ // on_signup inserts this row with a restrictive auth.users FK (not CASCADE).
+ const preferences=await request('/rest/v1/notification_preferences?user_id=eq.'+encodeURIComponent(userId),'DELETE',null,null,true);
+ if(!preferences.response.ok)throw new Error('Password probe preference cleanup failed (HTTP '+preferences.response.status+').');
+ const removed=await request('/auth/v1/admin/users/'+encodeURIComponent(userId),'DELETE',null,null,true);
+ if(!removed.response.ok)throw new Error('Password probe temporary account cleanup failed (HTTP '+removed.response.status+').');
+}
 try{
+ const previous=await request('/auth/v1/admin/users?page=1&per_page=100','GET',null,null,true);
+ for(const account of previous.data?.users||[]){
+  if(/^webmailhr-password-probe-[a-f0-9-]{36}@example\.invalid$/.test(account.email||'')&&account.user_metadata?.first_name==='WebmailHR'&&account.user_metadata?.last_name==='Verification')await removeProbe(account.id);
+ }
  const created=await request('/auth/v1/admin/users','POST',{email,password:initial,email_confirm:true,user_metadata:{first_name:'WebmailHR',last_name:'Verification',marketing_consent:false}},null,true);
  if(!created.response.ok||typeof created.data?.id!=='string')throw new Error('Password probe could not create its temporary account (HTTP '+created.response.status+').');
  id=created.data.id;
@@ -22,14 +34,15 @@ try{
  const old=await request('/auth/v1/token?grant_type=password','POST',{email,password:initial});
  if(old.response.ok)throw new Error('Password probe: previous password was accepted.');
  console.log('FormaPoint: live eight-digit password change and login passed; previous password rejected.');
+}catch(error){
+ console.error(error instanceof Error?error.message:'Password probe failed.');throw error;
 }finally{
  if(!id){
   const found=await request('/auth/v1/admin/users?page=1&per_page=100','GET',null,null,true);
   id=found.data?.users?.find(user=>user.email===email)?.id;
  }
  if(id){
-  const removed=await request('/auth/v1/admin/users/'+encodeURIComponent(id),'DELETE',null,null,true);
-  if(!removed.response.ok)throw new Error('Password probe temporary account cleanup failed (HTTP '+removed.response.status+').');
+  await removeProbe(id);
   cleaned=true;
  }
  console.log('FormaPoint: password probe temporary account cleanup '+(cleaned?'completed.':'not required.'));
