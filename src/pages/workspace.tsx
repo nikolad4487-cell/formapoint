@@ -1,3 +1,4 @@
+import { ChangePassword } from '../components/change-password';
 import { serviceReference } from '../lib/service-links';
 import { saveCatalogService, catalogError } from '../lib/catalog-editor';
 import { useSiteSettings, usePublishedPage } from '../hooks/use-site-settings';
@@ -1690,6 +1691,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
           </form>
         )}
       </QueryState>
+      <ChangePassword />
       <div className="panel">
         <h2>Sigurnost i osobni podaci</h2>
         <p>

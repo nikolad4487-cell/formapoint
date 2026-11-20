@@ -47,3 +47,20 @@ osobnu adresu korištenu pri registraciji. Sadrži novu adresu i uputu da lozink
 ostaje ona za FormaPoint; lozinka se ne generira niti šalje. WebmailHR koristi
 postojeći Mailjet i trajni red s provjerom ponavljanja. Kvar slanja ne blokira
 registraciju. Uspješna predaja Mailjetu ne potvrđuje dostavu u Gmailov Inbox.
+
+## Jedna lozinka na obje lokacije
+
+U Moj profil nalazi se izravan obrazac Promjena lozinke, uz postojeći oporavak
+putem e-pošte. Nova lozinka mora imati najmanje 8 znakova; samo znamenke također
+su dopuštene. Helper provjerava aktualnog korisnika, ponovno potvrđuje trenutačnu
+lozinku i ažurira vlastiti Supabase račun. Povezani WebmailHR uvijek provjerava
+istu izvornu lozinku, pa promjena ovdje vrijedi i za mail. WebmailHR obrazac
+mijenja isti izvorni račun uz provjeru UUID-a i vlastiti korisnički token, bez
+administratorskog resetiranja. Zasebna lokalna lozinka za povezane račune ne
+može se dodijeliti kroz WebmailHR administraciju.
+
+`WEBMAILHR_PASSWORD_PROBE=1` dopušta jednokratnu build provjeru produkcijskih Auth
+pravila na zasebnom privremenom example.invalid računu. Provjerava promjenu na
+osam znamenki, novu prijavu i odbijanje stare lozinke te briše probni račun u
+finally bloku. Ne ispisuje tajne ni tokene. Postavku nakon provjere vratiti na 0;
+inače je skripta isključena. Nema promjena lozinki postojećih korisnika.
