@@ -3,7 +3,7 @@ if(process.env.WEBMAILHR_PASSWORD_PROBE!=='1')process.exit(0);
 const base=process.env.SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY||process.env.SUPABASE_SECRET_KEY;
 if(base!=='https://heseilggogbtmqeuwlku.supabase.co'||!key)throw new Error('Password probe configuration is unavailable.');
 const email='webmailhr-password-probe-'+randomUUID()+'@example.invalid';
-const initial=randomBytes(24).toString('base64url'),numeric=String(randomInt(10000000,100000000));
+const initial=randomBytes(24).toString('base64url'),candidate=String.fromCharCode(97+randomInt(26))+String.fromCharCode(65+randomInt(26))+Array.from({length:5},()=> 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[randomInt(62)]).join('')+String(randomInt(10));
 let id,cleaned=false;
 async function request(path,method,body,token,admin=false){
  const response=await fetch(base+path,{method,redirect:'error',signal:AbortSignal.timeout(12000),headers:{apikey:key,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:admin&&key.startsWith('eyJ')?{Authorization:'Bearer '+key}:{})},...(body?{body:JSON.stringify(body)}:{})});
@@ -27,12 +27,12 @@ try{
  id=(created.data.user??created.data).id;
  const first=await request('/auth/v1/token?grant_type=password','POST',{email,password:initial});
  if(!first.response.ok||first.data?.user?.id!==id||!first.data.access_token)throw new Error('Password probe initial login failed.');
- let chosen=numeric;
+ let chosen=candidate;
  let changed=await request('/auth/v1/user','PUT',{password:chosen,current_password:initial},first.data.access_token);
  if(!changed.response.ok){
   const code=String(changed.data?.error_code||changed.data?.code||'').replace(/[^a-zA-Z0-9_]/g,'');
-  const detail=String(changed.data?.msg||changed.data?.message||'').split(initial).join('[redacted]').split(numeric).join('[redacted]').replace(/[\r\n]/g,' ').slice(0,300);
-  console.log('FormaPoint: eight-digit policy rejected HTTP '+changed.response.status+' code='+code+' detail='+detail);
+  const detail=String(changed.data?.msg||changed.data?.message||'').split(initial).join('[redacted]').split(candidate).join('[redacted]').replace(/[\r\n]/g,' ').slice(0,300);
+  console.log('FormaPoint: eight-character mixed-case/digit policy rejected HTTP '+changed.response.status+' code='+code+' detail='+detail);
   chosen='Aa1!'+randomBytes(12).toString('hex');
   changed=await request('/auth/v1/user','PUT',{password:chosen,current_password:initial},first.data.access_token);
  }
@@ -41,7 +41,7 @@ try{
  if(!next.response.ok||next.data?.user?.id!==id)throw new Error('Password probe: updated password login failed.');
  const old=await request('/auth/v1/token?grant_type=password','POST',{email,password:initial});
  if(old.response.ok)throw new Error('Password probe: previous password was accepted.');
- console.log(chosen===numeric?'FormaPoint: live eight-digit password change and login passed; previous password rejected.':'FormaPoint: source password change and login passed with stronger password; eight-digit policy requires adjustment.');
+ console.log(chosen===candidate?'FormaPoint: live eight-character mixed-case/digit password change and login passed; previous password rejected.':'FormaPoint: source password change and login passed with stronger password; eight-character mixed-case/digit policy requires adjustment.');
 }catch(error){
  console.error(error instanceof Error?error.message:'Password probe failed.');throw error;
 }finally{

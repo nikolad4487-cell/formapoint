@@ -51,8 +51,8 @@ registraciju. Uspješna predaja Mailjetu ne potvrđuje dostavu u Gmailov Inbox.
 ## Jedna lozinka na obje lokacije
 
 U Moj profil nalazi se izravan obrazac Promjena lozinke, uz postojeći oporavak
-putem e-pošte. Nova lozinka mora imati najmanje 8 znakova; samo znamenke također
-su dopuštene. Helper provjerava aktualnog korisnika, ponovno potvrđuje trenutačnu
+putem e-pošte. Nova lozinka mora imati najmanje 8 znakova i sadržavati malo slovo, veliko slovo
+i znamenku. Poseban znak nije obavezan. Helper provjerava aktualnog korisnika, ponovno potvrđuje trenutačnu
 lozinku i ažurira vlastiti Supabase račun. Povezani WebmailHR uvijek provjerava
 istu izvornu lozinku, pa promjena ovdje vrijedi i za mail. WebmailHR obrazac
 mijenja isti izvorni račun uz provjeru UUID-a i vlastiti korisnički token, bez
@@ -61,6 +61,6 @@ može se dodijeliti kroz WebmailHR administraciju.
 
 `WEBMAILHR_PASSWORD_PROBE=1` dopušta jednokratnu build provjeru produkcijskih Auth
 pravila na zasebnom privremenom example.invalid računu. Provjerava promjenu na
-osam znamenki, novu prijavu i odbijanje stare lozinke te briše probni račun u
+osam znakova s malim/velikim slovom i znamenkom, novu prijavu i odbijanje stare lozinke te briše probni račun u
 finally bloku. Ne ispisuje tajne ni tokene. Postavku nakon provjere vratiti na 0;
 inače je skripta isključena. Nema promjena lozinki postojećih korisnika.

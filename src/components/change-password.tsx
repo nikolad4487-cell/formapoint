@@ -46,8 +46,8 @@ export function ChangePassword() {
     >
       <h2>Promjena lozinke</h2>
       <p>
-        Ista lozinka vrijedi za FormaPoint i povezani WebmailHR sandučić. Najmanje 8 znakova;
-        dopuštene su i samo znamenke.
+        Ista lozinka vrijedi za FormaPoint i povezani WebmailHR sandučić. Najmanje 8 znakova, malo i
+        veliko slovo te broj.
       </p>
       <label>
         Trenutačna lozinka

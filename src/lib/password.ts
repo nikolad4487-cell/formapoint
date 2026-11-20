@@ -1,5 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+export const sharedPasswordHint =
+  'Lozinka mora imati najmanje 8 znakova, malo i veliko slovo te broj.';
+export const validSharedPassword = (value: string) =>
+  value.length >= 8 &&
+  value.length <= 512 &&
+  /[a-z]/.test(value) &&
+  /[A-Z]/.test(value) &&
+  /[0-9]/.test(value);
+
 type PasswordAuth = Pick<SupabaseClient['auth'], 'getUser' | 'signInWithPassword' | 'updateUser'>;
 export async function changeSharedPassword(
   auth: PasswordAuth,
@@ -7,8 +16,7 @@ export async function changeSharedPassword(
   currentPassword: string,
   newPassword: string,
 ) {
-  if (!currentPassword || newPassword.length < 8 || newPassword.length > 512)
-    throw new Error('Nova lozinka mora imati najmanje 8 znakova.');
+  if (!currentPassword || !validSharedPassword(newPassword)) throw new Error(sharedPasswordHint);
   if (currentPassword === newPassword) throw new Error('Odaberite drukčiju novu lozinku.');
   const checked = await auth.getUser();
   const user = checked.data.user;
@@ -23,6 +31,6 @@ export async function changeSharedPassword(
   });
   if (updated.error || updated.data.user?.id !== expectedUserId)
     throw new Error(
-      'Nova lozinka nije prihvaćena. Provjerite da ima najmanje 8 znakova i pokušajte ponovno.',
+      'Nova lozinka nije prihvaćena. Potrebno je najmanje 8 znakova, malo i veliko slovo te broj.',
     );
 }
