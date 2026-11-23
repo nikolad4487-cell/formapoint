@@ -1,7 +1,7 @@
 import {test,afterEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,createHmac} from 'node:crypto';
-import handler from '../../api/webmail-sync.js';
+import handler,{inspectRegistration} from '../../api/webmail-sync.js';
 const secret='local-webmail-sync-shared-secret-0123456789';
 Object.assign(process.env,{NODE_ENV:'test',SUPABASE_URL:'https://source-test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'server-key-must-stay-private',WEBMAILHR_SYNC_SECRET:secret});
 const user={id:'a22f722c-62b7-42eb-ab97-5dca30b91c98',email:'alice@example.test',email_confirmed_at:'2026-01-01',is_anonymous:false,user_metadata:{first_name:'Alice',last_name:'Test',role:'ADMIN'}};
@@ -52,4 +52,23 @@ test('Protected server setup and import filter accounts and report pagination',a
 test('Upstream failures are retryable and never expose source responses or server keys',async()=>{
   mock({upstreamStatus:500});const r=await call();assert.equal(r.status,503);assert.ok(!JSON.stringify(r).includes('PRIVATE'));assert.ok(!JSON.stringify(r).includes('server-key'));
   assert.equal((await call({method:'GET'})).status,405);
+});
+
+test('A temporary receiver failure retries the same verified identity and succeeds',async()=>{
+ mock();const normal=globalThis.fetch;const forwards=[];
+ globalThis.fetch=async(url,options)=>{
+  if(String(url).startsWith('https://webmailhr.com/')){forwards.push(options.body);if(forwards.length===1)return new Response('{}',{status:503});}
+  return normal(url,options);
+ };
+ const result=await call();assert.equal(result.status,200);assert.equal(forwards.length,2);assert.equal(forwards[0],forwards[1]);
+});
+test('Targeted registration inspection never forwards unconfirmed accounts or other users',async()=>{
+ for(const confirmed of [true,false]){
+  const selected={...user,email_confirmed_at:confirmed?'2026-01-01':null};
+  const calls=mock({users:[{...user,id:'b22f722c-62b7-42eb-ab97-5dca30b91c98',email:'other@example.test'},selected]});
+  const result=await inspectRegistration(user.email,true);assert.equal(result.found,true);assert.equal(result.confirmed,confirmed);
+  const forwarded=calls.filter(c=>c.url.startsWith('https://webmailhr.com/'));
+  assert.equal(forwarded.length,confirmed?1:0);
+  if(confirmed)assert.deepEqual(JSON.parse(forwarded[0].options.body).users.map(u=>u.email),[user.email]);
+ }
 });
