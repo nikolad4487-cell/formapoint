@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { fixtureServices, workspaceFixture } from '../fixtures/workspace';
+import { fixtureServices, fixtureUser, workspaceFixture } from '../fixtures/workspace';
 
 async function packageFixture(page: Page, signedIn = true) {
   await workspaceFixture(page, { admin: true, signedIn, stripe: true });
@@ -8,6 +8,7 @@ async function packageFixture(page: Page, signedIn = true) {
   let saved: any;
   let cart: any[] = [];
   let added: any;
+  let addCount = 0;
   await page.route('**/rest/v1/services**', (route) => route.fulfill({ json: [service] }));
   await page.route('**/rest/v1/service_variants**', (route) => route.fulfill({ json: packages }));
   await page.route('**/rest/v1/rpc/save_service_packages', (route) => {
@@ -23,6 +24,7 @@ async function packageFixture(page: Page, signedIn = true) {
   });
   await page.route('**/rest/v1/cart_items**', (route) => route.fulfill({ json: cart }));
   await page.route('**/rest/v1/rpc/cart_add_variant', (route) => {
+    addCount++;
     added = route.request().postDataJSON();
     cart = [
       {
@@ -49,6 +51,7 @@ async function packageFixture(page: Page, signedIn = true) {
     service,
     saved: () => saved,
     added: () => added,
+    addCount: () => addCount,
     seed: () => {
       service = { ...service, packages_enabled: true };
       packages = [
@@ -194,4 +197,225 @@ test('administrator može odbaciti nacrt i ponovno učitati spremljene pakete', 
       Object.keys(sessionStorage).filter((key) => key.startsWith('fp-package-draft:')),
     ),
   ).toEqual([]);
+});
+
+function loginSession() {
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return {
+    access_token: `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ sub: fixtureUser, role: 'authenticated', exp })}.fixture`,
+    refresh_token: 'test-only-refresh-token',
+    expires_in: 3600,
+    expires_at: exp,
+    token_type: 'bearer',
+    user: {
+      id: fixtureUser,
+      aud: 'authenticated',
+      role: 'authenticated',
+      is_anonymous: false,
+      email: 'test@example.invalid',
+      app_metadata: { provider: 'email' },
+      user_metadata: { first_name: 'Test', last_name: 'Korisnik' },
+      created_at: '2026-10-01T10:00:00Z',
+    },
+  };
+}
+
+test('prijavljeni korisnik dodaje paket u aplikaciji bez preusmjeravanja i odjave', async ({
+  page,
+}) => {
+  const fixture = await packageFixture(page);
+  fixture.seed();
+  const signouts: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/auth/v1/logout')) signouts.push(request.url());
+  });
+  await page.goto('/app/nova-narudzba');
+  await expect(page.getByRole('heading', { name: 'Mjesečni paket', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Dodaj u košaricu', exact: true }).click();
+  await expect.poll(() => fixture.addCount()).toBe(1);
+  await expect(page).toHaveURL(/\/app\/nova-narudzba$/);
+  await page.getByRole('link', { name: 'Otvori košaricu', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { name: `${fixture.service.name} — Mjesečni paket`, exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.cart-total')).toContainText('350,00');
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('sb-127-auth-token')!).user.id),
+  ).toBe(fixtureUser);
+  await page.goto(`/usluge/${fixture.service.slug}`);
+  await expect(
+    page.locator('header').getByRole('link', { name: 'Moj račun', exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.locator('header').getByRole('link', { name: 'Prijava', exact: false }),
+  ).toHaveCount(0);
+  expect(signouts).toEqual([]);
+});
+
+for (const mode of ['login', 'register'] as const) {
+  test(`gost zadržava odabrani paket kroz ${mode}, osvježavanje stranice i ulazak u košaricu`, async ({
+    page,
+  }) => {
+    const fixture = await packageFixture(page, false);
+    fixture.seed();
+    await page.route('**/auth/v1/token?grant_type=password', (route) =>
+      route.fulfill({ json: loginSession() }),
+    );
+    await page.route('**/auth/v1/signup', (route) => route.fulfill({ json: loginSession() }));
+    await page.goto(`/usluge/${fixture.service.slug}`);
+    await page.getByRole('button', { name: 'Dodaj u košaricu', exact: true }).click();
+    await expect(page).toHaveURL(/kupnja-kao-gost\?.*package=/);
+    await page.getByRole('link', { name: 'Imam račun', exact: true }).click();
+    await expect(page).toHaveURL(/prijava\?.*package=b1900000-0000-4000-8000-000000000011/);
+    if (mode === 'register')
+      await page.getByRole('link', { name: 'Registrirajte se', exact: true }).click();
+    await page.reload();
+    if (mode === 'register') {
+      await page.getByLabel('Ime', { exact: true }).fill('Test');
+      await page.getByLabel('Prezime', { exact: true }).fill('Korisnik');
+      await page.getByLabel('Potvrda lozinke', { exact: true }).fill('Abcd1234');
+      await page.locator('input[name=terms]').check();
+    }
+    await page.getByLabel('E-mail adresa', { exact: true }).fill('test@example.invalid');
+    await page.locator('input[name=password]').fill('Abcd1234');
+    await page
+      .getByRole('button', {
+        name: mode === 'login' ? 'Prijavi se' : 'Kreiraj račun',
+        exact: false,
+      })
+      .click();
+    await expect(page).toHaveURL(/\/app\/kosarica$/);
+    await expect(
+      page.getByRole('heading', { name: `${fixture.service.name} — Mjesečni paket`, exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('.cart-total')).toContainText('350,00');
+    expect(fixture.added()).toMatchObject({
+      p_service: fixture.service.id,
+      p_variant: 'b1900000-0000-4000-8000-000000000011',
+      p_quantity: 1,
+    });
+    expect(fixture.addCount()).toBe(1);
+    await page.reload();
+    await expect(
+      page.getByRole('heading', { name: `${fixture.service.name} — Mjesečni paket`, exact: true }),
+    ).toBeVisible();
+    expect(fixture.addCount()).toBe(1);
+  });
+}
+
+test('gost dovršava kontaktni obrazac s odabranim paketom i zadržava pristup košarici', async ({
+  page,
+}) => {
+  const fixture = await packageFixture(page, false);
+  fixture.seed();
+  await page.route('**/auth/v1/signup', (route) =>
+    route.fulfill({
+      json: { ...loginSession(), user: { ...loginSession().user, is_anonymous: true, email: '' } },
+    }),
+  );
+  await page.goto(`/usluge/${fixture.service.slug}`);
+  await page.getByRole('button', { name: 'Dodaj u košaricu', exact: true }).click();
+  await page.getByLabel('Ime', { exact: true }).fill('Test');
+  await page.getByLabel('Prezime', { exact: true }).fill('Gost');
+  await page.getByLabel('E-mail', { exact: true }).fill('gost@example.invalid');
+  await page.locator('input[name=terms]').check();
+  await page.getByRole('button', { name: 'Nastavi kao gost', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/kosarica$/);
+  await expect(page.locator('.cart-total')).toContainText('350,00');
+  await page.reload();
+  await expect(
+    page.getByRole('heading', { name: `${fixture.service.name} — Mjesečni paket`, exact: true }),
+  ).toBeVisible();
+  expect(fixture.addCount()).toBe(1);
+});
+
+test('paket se ne preusmjerava gostu dok traje obnova postojeće prijave', async ({ page }) => {
+  const fixture = await packageFixture(page);
+  fixture.seed();
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/rest/v1/user_roles?**', async (route) => {
+    await gate;
+    await route.fulfill({ json: [{ role: 'ADMIN' }] });
+  });
+  try {
+    await page.goto(`/usluge/${fixture.service.slug}`);
+    await expect(
+      page.locator('.service-package').getByRole('button', { name: 'Provjera prijave…' }),
+    ).toBeDisabled();
+    await expect(page).not.toHaveURL(/kupnja-kao-gost|prijava/);
+    release();
+    await page.getByRole('button', { name: 'Dodaj u košaricu', exact: true }).click();
+    await expect.poll(() => fixture.addCount()).toBe(1);
+    await expect(page).not.toHaveURL(/kupnja-kao-gost|prijava/);
+  } finally {
+    release();
+  }
+});
+
+test('neuspjelo dodavanje nakon prijave zadržava paket i omogućuje ponovni pokušaj', async ({
+  page,
+}) => {
+  const fixture = await packageFixture(page, false);
+  fixture.seed();
+  let reject = true;
+  await page.route('**/auth/v1/token?grant_type=password', (route) =>
+    route.fulfill({ json: loginSession() }),
+  );
+  await page.route('**/rest/v1/rpc/cart_add_variant', (route) =>
+    reject
+      ? route.fulfill({
+          status: 400,
+          json: { code: 'P0001', message: 'Privremena pogreška dodavanja paketa.' },
+        })
+      : route.fallback(),
+  );
+  await page.goto(
+    `/prijava?service=${fixture.service.id}&quantity=1&package=b1900000-0000-4000-8000-000000000011`,
+  );
+  await page.getByLabel('E-mail adresa', { exact: true }).fill('test@example.invalid');
+  await page.locator('input[name=password]').fill('Abcd1234');
+  await page.getByRole('button', { name: 'Prijavi se', exact: false }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Prijava je uspjela, ali dodavanje u košaricu nije uspjelo.',
+  );
+  expect(fixture.addCount()).toBe(0);
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('sb-127-auth-token')!).user.id),
+  ).toBe(fixtureUser);
+  reject = false;
+  await page
+    .getByRole('button', { name: 'Pokušaj ponovno dodati u košaricu', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/app\/kosarica$/);
+  await expect(page.locator('.cart-total')).toContainText('350,00');
+  expect(fixture.addCount()).toBe(1);
+});
+
+test('stvarno istekla prijava zadržava paket kroz ponovnu prijavu', async ({ page }) => {
+  const fixture = await packageFixture(page);
+  fixture.seed();
+  let expired = true;
+  await page.route('**/rest/v1/rpc/cart_add_variant', (route) =>
+    expired
+      ? route.fulfill({ status: 401, json: { code: 'PGRST301', message: 'JWT expired' } })
+      : route.fallback(),
+  );
+  await page.route('**/auth/v1/token?grant_type=password', (route) =>
+    route.fulfill({ json: loginSession() }),
+  );
+  await page.goto(`/usluge/${fixture.service.slug}`);
+  await page.getByRole('button', { name: 'Dodaj u košaricu', exact: true }).click();
+  await expect(page).toHaveURL(/prijava\?.*package=b1900000-0000-4000-8000-000000000011/);
+  expect(fixture.addCount()).toBe(0);
+  expired = false;
+  await page.getByLabel('E-mail adresa', { exact: true }).fill('test@example.invalid');
+  await page.locator('input[name=password]').fill('Abcd1234');
+  await page.getByRole('button', { name: 'Prijavi se', exact: false }).click();
+  await expect(page).toHaveURL(/\/app\/kosarica$/);
+  await expect(page.locator('.cart-total')).toContainText('350,00');
+  expect(fixture.addCount()).toBe(1);
 });

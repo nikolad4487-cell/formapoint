@@ -38,3 +38,13 @@ Nisu potrebni novi ključevi niti objava Stripe funkcija. Prije SQL nadogradnje 
 Izmjene paketa automatski se čuvaju kao nespremljeni nacrt u `sessionStorage`, zasebno po administratorskom računu i usluzi. Ponovno otvaranje prozora ili osvježavanje iste kartice vraća unos. To ne objavljuje cijene kupcima: potrebno je kliknuti **Spremi pakete** i pričekati potvrdu uspješnog spremanja. Nacrt se uklanja tek nakon uspješnog odgovora baze ili pritiskom na **Odbaci nacrt**, koji vraća spremljene vrijednosti. Neuspješan zahtjev ostavlja prozor otvoren, prikazuje pogrešku i zadržava unos.
 
 Nacrt traje tijekom sesije te kartice preglednika; ne zamjenjuje spremanje u bazu niti može vratiti podatke izgubljene prije uvođenja ove zaštite. Ako preglednik ne dopušta lokalnu pohranu, obrazac to jasno prikazuje.
+
+## Odabir paketa, prijava i košarica
+
+U radnom prostoru **Nova narudžba** aktivni paketi prikazuju se unutar samog kataloga. Dodavanje konkretnog paketa ostaje na toj stranici; košarica se otvara postojećom poveznicom. Javno zaglavlje prijavljenom korisniku pokazuje **Moj račun**, a gostu **Moje narudžbe**, umjesto prikaza koji sugerira odjavu.
+
+Gumb za dodavanje čeka završetak početne obnove prijave i dodatno provjerava SDK sesiju prije odluke o gostujućoj kupnji. Gumbi imaju `type="button"`, pa ne šalju okolni obrazac. Ako API odbije zahtjev zbog istekle prijave (401), prijava se otvara uz očuvani identifikator usluge, paketa i količinu.
+
+Odabir se prenosi poveznicama između kupnje kao gost, prijave i registracije, uključujući poveznice u zaglavlju, i preživljava osvježavanje tih stranica. Nakon uspješne prijave ili registracije odabrani paket dodaje se u korisnikovu košaricu, zatim se otvara košarica. Cijena se nikada ne prenosi URL-om; provjerava se u bazi. Neispravni identifikatori ili količine ne zamjenjuju paket osnovnim artiklom.
+
+Neuspjelo dodavanje nakon uspješne prijave prikazuje zasebnu pogrešku i omogućuje ponovni pokušaj bez ponovnog unosa lozinke. Ovo ne zahtijeva novu SQL nadogradnju. Postojeće gostujuće narudžbe i košarica ostaju vezane uz istu sesiju preglednika; registracija gosta i dalje nadograđuje njegov postojeći račun.

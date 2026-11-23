@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/use-auth';
-import { rpc } from '../lib/supabase';
+import { requireDb } from '../lib/supabase';
+import { cartSelectionSearch } from '../lib/cart-selection';
 import { servicePath } from '../lib/service-links';
 import type { Service, ServicePackage } from '../lib/domain';
 import { Button } from './ui/button';
@@ -17,7 +18,7 @@ export function AddToCartButton({
   quantity?: number;
   variant?: ServicePackage;
 }) {
-  const { session } = useAuth();
+  const { session, loading } = useAuth();
   const navigate = useNavigate();
   const cache = useQueryClient();
   const [busy, setBusy] = useState(false);
@@ -37,21 +38,42 @@ export function AddToCartButton({
     );
   return (
     <Button
-      disabled={busy}
+      type="button"
+      disabled={busy || loading}
+      aria-busy={busy || loading}
       onClick={async () => {
-        if (!session) {
-          navigate(
-            `/kupnja-kao-gost?service=${encodeURIComponent(service.id)}&quantity=${quantity}${variant ? `&package=${encodeURIComponent(variant.id)}` : ''}`,
-          );
-          return;
-        }
+        if (busy || loading) return;
         setBusy(true);
         try {
-          await rpc(variant ? 'cart_add_variant' : 'cart_add', {
+          // Read the SDK's restored session before deciding that this is a guest.
+          const current = await requireDb().auth.getSession();
+          const selection = cartSelectionSearch({
+            service: service.id,
+            quantity,
+            ...(variant ? { package: variant.id } : {}),
+          });
+          if (current.error) {
+            navigate(`/prijava${selection}`, { state: { from: '/app/kosarica' } });
+            return;
+          }
+          if (!current.data.session) {
+            navigate(`${session ? '/prijava' : '/kupnja-kao-gost'}${selection}`, {
+              state: { from: '/app/kosarica' },
+            });
+            return;
+          }
+          const result = await requireDb().rpc(variant ? 'cart_add_variant' : 'cart_add', {
             p_service: service.id,
             p_quantity: quantity,
             ...(variant ? { p_variant: variant.id } : {}),
           });
+          if (result.error) {
+            if (result.status === 401) {
+              navigate(`/prijava${selection}`, { state: { from: '/app/kosarica' } });
+              return;
+            }
+            throw new Error(result.error.message);
+          }
           await cache.invalidateQueries({ queryKey: ['cart'] });
           toast.success('Artikl je dodan u košaricu.');
         } catch (error) {
@@ -62,7 +84,7 @@ export function AddToCartButton({
       }}
     >
       <ShoppingBag size={16} />
-      {busy ? 'Dodavanje…' : 'Dodaj u košaricu'}
+      {loading ? 'Provjera prijave…' : busy ? 'Dodavanje…' : 'Dodaj u košaricu'}
     </Button>
   );
 }

@@ -1,3 +1,8 @@
+import {
+  readCartSelection,
+  cartSelectionSearch,
+  cartSelectionRequest,
+} from '../lib/cart-selection';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,6 +13,7 @@ import { ensureGuestSession } from '../lib/guest';
 
 export function GuestPage() {
   const [params] = useSearchParams();
+  const selection = readCartSelection(params);
   const location = useLocation();
   const navigate = useNavigate();
   const cache = useQueryClient();
@@ -38,13 +44,13 @@ export function GuestPage() {
               p_terms: form.get('terms') === 'on',
             });
             const service = params.get('service');
-            if (service) {
-              const quantity = Number(params.get('quantity') || 1);
-              await rpc(params.get('package') ? 'cart_add_variant' : 'cart_add', {
-                p_service: service,
-                p_quantity: quantity,
-                ...(params.get('package') ? { p_variant: params.get('package') } : {}),
-              });
+            if (service && !selection)
+              throw new Error(
+                'Odabrani artikal ili paket nije ispravan. Ponovno ga odaberite u katalogu.',
+              );
+            if (selection) {
+              const request = cartSelectionRequest(selection);
+              await rpc(request.name, request.args);
             }
             await cache.invalidateQueries();
             const from = location.state?.from;
@@ -103,7 +109,9 @@ export function GuestPage() {
         <div className="actions">
           <Button disabled={busy}>{busy ? 'Spremanje…' : 'Nastavi kao gost'}</Button>
           <Button asChild variant="outline">
-            <Link to="/prijava">Imam račun</Link>
+            <Link to={`/prijava${cartSelectionSearch(selection)}`} state={location.state}>
+              Imam račun
+            </Link>
           </Button>
         </div>
       </form>

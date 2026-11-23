@@ -1,3 +1,4 @@
+import { readCartSelection, cartSelectionSearch } from '../lib/cart-selection';
 import { useSiteSettings, usePublishedPage } from '../hooks/use-site-settings';
 import { SocialLinks } from './social-links';
 import { DiscountBanner } from './discount-banner';
@@ -36,6 +37,11 @@ import { useAuth } from '../hooks/use-auth';
 import { db, configured } from '../lib/supabase';
 import { toast } from 'sonner';
 export function PublicHeader() {
+  const { session, role, loading } = useAuth();
+  const location = useLocation();
+  const selectionSearch = cartSelectionSearch(
+    readCartSelection(new URLSearchParams(location.search)),
+  );
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -60,14 +66,45 @@ export function PublicHeader() {
             <Link to="/app/kosarica" aria-label="Košarica">
               <ShoppingBag size={20} />
             </Link>
-            <Link className="login-link" to="/prijava">
-              Prijava <ArrowUpRight size={15} />
-            </Link>
-            <Button asChild size="sm">
-              <Link to="/registracija">
-                Registracija <ArrowRight size={15} />
-              </Link>
-            </Button>
+            {session ? (
+              <>
+                <Link className="login-link" to={role === 'ADMIN' ? '/admin' : '/app'}>
+                  {session.user.is_anonymous ? 'Moje narudžbe' : 'Moj račun'}{' '}
+                  <ArrowUpRight size={15} />
+                </Link>
+                <Button asChild size="sm">
+                  <Link
+                    to={
+                      session.user.is_anonymous
+                        ? `/registracija${selectionSearch}`
+                        : '/app/nova-narudzba'
+                    }
+                  >
+                    {session.user.is_anonymous ? 'Spremi račun' : 'Nova narudžba'}{' '}
+                    <ArrowRight size={15} />
+                  </Link>
+                </Button>
+              </>
+            ) : loading ? (
+              <Button type="button" size="sm" disabled>
+                Provjera prijave…
+              </Button>
+            ) : (
+              <>
+                <Link
+                  className="login-link"
+                  to={`/prijava${selectionSearch}`}
+                  state={location.state}
+                >
+                  Prijava <ArrowUpRight size={15} />
+                </Link>
+                <Button asChild size="sm">
+                  <Link to={`/registracija${selectionSearch}`} state={location.state}>
+                    Registracija <ArrowRight size={15} />
+                  </Link>
+                </Button>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"

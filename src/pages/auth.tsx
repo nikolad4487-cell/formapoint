@@ -1,6 +1,12 @@
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  readCartSelection,
+  cartSelectionSearch,
+  cartSelectionRequest,
+} from '../lib/cart-selection';
 import { WorkspaceIllustration, BrandBenefit } from '../components/brand';
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,7 +21,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Logo, Unavailable } from '../components/common';
-import { configured, requireDb } from '../lib/supabase';
+import { configured, requireDb, rpc } from '../lib/supabase';
 const schema = z.object({
   email: z.string(),
   password: z.string(),
@@ -37,6 +43,43 @@ export function AuthPage({
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
+  const cache = useQueryClient();
+  const [params] = useSearchParams();
+  const selection = readCartSelection(params);
+  const selectionSearch = cartSelectionSearch(selection);
+  const [cartFailure, setCartFailure] = useState(false);
+  const [retryingCart, setRetryingCart] = useState(false);
+  async function continuePurchase() {
+    if (params.has('service') && !selection) {
+      setError(
+        'Prijava je uspjela, ali odabrani artikal ili paket nije ispravan. Ponovno ga odaberite u katalogu.',
+      );
+      return;
+    }
+    if (selection) {
+      try {
+        const request = cartSelectionRequest(selection);
+        await rpc(request.name, request.args);
+        await cache.invalidateQueries({ queryKey: ['cart'] });
+        setCartFailure(false);
+        navigate('/app/kosarica', { replace: true });
+      } catch (e) {
+        setCartFailure(true);
+        setError(
+          `Prijava je uspjela, ali dodavanje u košaricu nije uspjelo. ${e instanceof Error ? e.message : 'Pokušajte ponovno.'}`,
+        );
+      }
+      return;
+    }
+    const from = location.state?.from;
+    navigate(
+      typeof from === 'string' &&
+        (from === '/app' || from.startsWith('/app/') || from.startsWith('/app?'))
+        ? from
+        : '/app',
+      { replace: true },
+    );
+  }
   const registerMode = mode === 'register';
   const passwordMode = ['login', 'register', 'reset'].includes(mode);
   const {
@@ -90,8 +133,7 @@ export function AuthPage({
       if (mode === 'login') {
         const { error } = await auth.signInWithPassword({ email: v.email, password: v.password });
         if (error) throw error;
-        const from = location.state?.from;
-        navigate(typeof from === 'string' && from.startsWith('/app') ? from : '/app');
+        await continuePurchase();
       }
       if (registerMode) {
         const metadata = {
@@ -130,7 +172,7 @@ export function AuthPage({
               'Račun je kreiran, ali automatska prijava nije dostupna. Pokušajte se prijaviti ili se obratite podršci.',
             );
         }
-        navigate('/app');
+        await continuePurchase();
       }
       if (mode === 'forgot') {
         const { error } = await auth.resetPasswordForEmail(v.email, {
@@ -185,14 +227,16 @@ export function AuthPage({
             <Link
               aria-current={mode === 'login' ? 'page' : undefined}
               className={mode === 'login' ? 'active' : ''}
-              to="/prijava"
+              to={`/prijava${selectionSearch}`}
+              state={location.state}
             >
               Prijava
             </Link>
             <Link
               aria-current={registerMode ? 'page' : undefined}
               className={registerMode ? 'active' : ''}
-              to="/registracija"
+              to={`/registracija${selectionSearch}`}
+              state={location.state}
             >
               Registracija
             </Link>
@@ -208,7 +252,9 @@ export function AuthPage({
         </p>
         {(mode === 'login' || registerMode) && (
           <p>
-            <Link to="/kupnja-kao-gost">Nastavi kupnju kao gost, bez računa</Link>
+            <Link to={`/kupnja-kao-gost${selectionSearch}`} state={location.state}>
+              Nastavi kupnju kao gost, bez računa
+            </Link>
           </p>
         )}
         {!configured && <Unavailable />}
@@ -222,7 +268,9 @@ export function AuthPage({
               </p>
             </div>
             <Button asChild>
-              <Link to="/prijava">Na prijavu</Link>
+              <Link to={`/prijava${selectionSearch}`} state={location.state}>
+                Na prijavu
+              </Link>
             </Button>
           </>
         ) : (
@@ -308,6 +356,23 @@ export function AuthPage({
                 {error}
               </p>
             )}
+            {cartFailure && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={retryingCart || isSubmitting}
+                onClick={async () => {
+                  setRetryingCart(true);
+                  try {
+                    await continuePurchase();
+                  } finally {
+                    setRetryingCart(false);
+                  }
+                }}
+              >
+                Pokušaj ponovno dodati u košaricu
+              </Button>
+            )}
             {notice && (
               <p className="notice" role="status">
                 {notice}
@@ -327,11 +392,17 @@ export function AuthPage({
             </Button>
             {mode === 'login' ? (
               <p className="auth-switch">
-                Nemate račun? <Link to="/registracija">Registrirajte se</Link>
+                Nemate račun?{' '}
+                <Link to={`/registracija${selectionSearch}`} state={location.state}>
+                  Registrirajte se
+                </Link>
               </p>
             ) : (
               <p className="auth-switch">
-                Već imate račun? <Link to="/prijava">Prijavite se</Link>
+                Već imate račun?{' '}
+                <Link to={`/prijava${selectionSearch}`} state={location.state}>
+                  Prijavite se
+                </Link>
               </p>
             )}
           </form>
