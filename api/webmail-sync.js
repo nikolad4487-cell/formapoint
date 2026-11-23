@@ -97,10 +97,15 @@ async function forward(config, users, setup = false) {
   const signature = createHmac('sha256', config.secret)
     .update(timestamp + '\n' + hash)
     .digest('hex');
-  const response = await fetch(config.target, {
+  let response;
+  // Provisioning and welcome claims are idempotent by verified source UUID.
+  // Retry one temporary failure, including a lost response after a committed write.
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      response = await fetch(config.target, {
     method: 'POST',
     redirect: 'error',
-    signal: AbortSignal.timeout(45000),
+    signal: AbortSignal.timeout(20000),
     headers: {
       'Content-Type': 'application/json',
       'X-Webmail-Sync-Timestamp': timestamp,
@@ -109,11 +114,32 @@ async function forward(config, users, setup = false) {
     },
     body,
   });
+      if(![429,500,502,503,504].includes(response.status)||attempt===1)break;
+    }catch{
+      if(attempt===1)throw new SyncError(503,'Sandučić trenutačno nije moguće povezati.');
+    }
+    await new Promise(resolve=>setTimeout(resolve,500));
+  }
   if (!response.ok) throw new SyncError(503, 'Sandučić trenutačno nije moguće povezati.');
   const result = await response.json();
   if (result?.ok !== true || !Array.isArray(result.results))
     throw new SyncError(503, 'Potvrda povezivanja nije dostupna.');
   return result.results;
+}
+// Server-only operator repair: inspect one named account without exposing Auth keys.
+export async function inspectRegistration(email,apply=false){
+ const config=settings();
+ if(!process.env.SUPABASE_SERVICE_ROLE_KEY&&!process.env.SUPABASE_SECRET_KEY)throw new SyncError(503,'Serverski pristup nije dostupan.');
+ if(typeof email!=='string'||! /^[^\s<>@]+@[^\s<>@]+$/.test(email))throw new SyncError(400,'Neispravna adresa.');
+ for(let page=1;page<=100;page++){
+  const data=await authGet(config,`/auth/v1/admin/users?page=${page}&per_page=50`);
+  if(!Array.isArray(data.users))throw new SyncError(503,'Izvor nije dostupan.');
+  const matches=data.users.filter(u=>u.email?.toLowerCase()===email.toLowerCase());
+  if(matches.length>1)throw new SyncError(409,'Više izvornih računa.');
+  if(matches.length){const user=matches[0];return {found:true,confirmed:!!user.email_confirmed_at,eligible:!!eligible(user),...(apply&&eligible(user)?{results:await forward(config,[person(user)])}:{})};}
+  if(data.users.length<50)return {found:false};
+ }
+ throw new SyncError(503,'Previše stranica za ovu provjeru.');
 }
 async function bodyOf(req) {
   if (req.body !== undefined) {
