@@ -15,7 +15,7 @@ Nadogradnja `public/migracije/202611120020_scheduled_prices.sql` priprema odobre
 | Pisanje sastavka                             | 20 €                |
 | Seminar — nova usluga                        | 30 €                |
 
-Postojeći artikli povezani su prema provjerenim identifikatorima, pa jednak slug u drugoj kategoriji ne preusmjerava promjenu. Online administracija, upravljanje e-poštom, njihovi paketi i dodatne stranice/slajdovi nisu dio ovog cjenika. Cijene koje su već na željenom iznosu svejedno dobivaju zapis u rasporedu.
+Postojeći artikli povezani su prema provjerenim identifikatorima, pa jednak slug u drugoj kategoriji ne preusmjerava promjenu. Osnovna nadogradnja 020 ne mijenja administraciju, e-poštu, njihove pakete ni dodatne stranice/slajdove. Naknadno odobreni paketi administracije i e-pošte pripremaju se nadogradnjom 021 opisanom niže. Cijene koje su već na željenom iznosu svejedno dobivaju zapis u rasporedu.
 
 Seminar se priprema kao neobjavljeni nacrt u kategoriji **Učenički radovi - osnovna i srednja škola**. Prije datuma nema novu fiksnu cijenu. Vlasnik treba dovršiti opis/opseg i rok te sam objaviti uslugu. Raspored mijenja njezinu cijenu na 30 €, ali ne uključuje javnu objavu umjesto vlasnika.
 
@@ -46,4 +46,24 @@ Ako je usluga izbrisana ili je u međuvremenu prebačena na pakete, promjena dob
 
 Kartice artikala, detalji usluge, katalog nove narudžbe i administracijski popis prikazuju crveno, lijevo ispod trenutačne cijene, primjerice **Cijena od 1.1.2027. 80,00 €**. Najava se prikazuje i u javnom HTML-u bez JavaScripta. U ponoć po Hrvatskoj se uklanja, uključujući već otvoreni interaktivni prikaz.
 
-Ovo je najava konkretnog odobrenog cjenika za 2027. iz `seo/announced-prices.mjs`, a ne javni pristup privatnom administracijskom rasporedu. Test provjerava podudaranje iznosa za postojeće artikle s nadogradnjom 020. Ako se naknadno mijenja ili otkazuje taj odobreni cjenik, treba uskladiti i javnu najavu; proizvoljne nove zakazane promjene ne objavljuju se automatski. Administracija, paketi i dodatne stranice nemaju najavu bez odobrenih novih cijena. Dodavanje najave ne zahtijeva novu SQL nadogradnju i ne mijenja iznose naplate ili postojećih narudžbi.
+Ovo je najava konkretnog odobrenog cjenika za 2027. iz `seo/announced-prices.mjs`, a ne javni pristup privatnom administracijskom rasporedu. Test provjerava podudaranje iznosa za postojeće artikle s nadogradnjom 020. Ako se naknadno mijenja ili otkazuje taj odobreni cjenik, treba uskladiti i javnu najavu; proizvoljne nove zakazane promjene ne objavljuju se automatski. Administracija i e-pošta prikazuju naknadno odobrene pakete iz `seo/package-prices-2027.mjs`; dodatne stranice i drugi paketi nemaju izmišljene buduće cijene. Dodavanje najave ne zahtijeva novu SQL nadogradnju i ne mijenja iznose naplate ili postojećih narudžbi.
+
+## Paketi administracije i e-pošte od 1.1.2027. — nadogradnja 021
+
+Nakon 020 pokrenuti cijelu datoteku [202611230021_scheduled_package_prices.sql](../public/migracije/202611230021_scheduled_package_prices.sql) u Supabase SQL Editoru. Na kraju moraju biti prikazana dva rasporeda: e-pošta s tri paketa i administracija s dva, za početak **1.1.2027. u 00:00 Europe/Zagreb**. To nije već izvršeno na javnoj bazi samim Git pushom. Nadogradnja se može sigurno ponoviti; ne uključuje nove pakete prije roka.
+
+| Usluga                        | Paket i opseg                                | Cijena  |
+| ----------------------------- | -------------------------------------------- | ------- |
+| Upravljanje i vođenje e-pošte | Jednokratno, do 4 sata                       | 70 €    |
+| Upravljanje i vođenje e-pošte | Tjedno, 3 sata dnevno, 5 dana (15 sati)      | 90 €    |
+| Upravljanje i vođenje e-pošte | Mjesečno, 4 sata dnevno, ponedjeljak – petak | 350 €   |
+| Online administracija         | Tjedno, 4 sata dnevno, 5 dana (20 sati)      | 300 €   |
+| Online administracija         | Mjesečno, 4 sata dnevno, ponedjeljak – petak | 1.300 € |
+
+Mjesečni paketi imaju fiksnu cijenu neovisno o broju radnih dana u mjesecu. Blagdani i drugi neradni dani uređuju se prema dogovoru. Svaki paket kupuje se jednom za odabrano razdoblje; nema automatske obnove ili ponavljajuće naplate.
+
+Prije roka postojeće usluge i paketi zadržavaju današnje iznose i način kupnje. Crvena javna najava prikazuje odobrene buduće pakete, uključujući uvjete mjesečne cijene. Kod paketa e-pošte novi jednokratni opseg je **do 4 sata**, a tjedni **3 sata dnevno, 5 dana**, prema zadnjoj uputi vlasnika.
+
+U Administracija → Usluge → Zakazane promjene cijena prikazuje se svaki paket, opseg i iznos. Raspored se može otkazati postojećim gumbom; tada uskladiti i javnu najavu. Na početku valjanosti postojeći radnik `apply_due_service_prices`, javno osvježavanje kataloga i provjera prije naplate primjenjuju plan: kreiraju pet aktivnih paketa, uključuju paketni odabir na te dvije usluge i arhiviraju njihove prethodne pakete. Zadržavaju se postojeće narudžbe, cijene i snimke već kupljenih paketa. Stara košarica koja se više ne podudara s paketnim odabirom traži novi odabir; ne naplaćuje se zamjenska cijena.
+
+Izvor odobrenih paketa je `seo/package-prices-2027.mjs`. `node scripts/build-package-prices-upgrade.mjs` iz njega ažurira SQL sjeme i datoteku za SQL Editor; build provjerava njihovo podudaranje. Baza primjenjuje raspored samo jednom. Neispravan plan označava se za provjeru, uz povrat svih djelomičnih izmjena, i ne blokira ostale dospjele cijene.

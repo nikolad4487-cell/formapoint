@@ -48,6 +48,8 @@ try {
   for (const file of readdirSync('supabase/migrations')
     .filter((x) => x.endsWith('.sql'))
     .sort()) {
+    // The owner IDs used by 021 are created by scheduled-prices.sql below.
+    if (file === '202611230021_scheduled_package_prices.sql') continue;
     if (file === '202610240008_payment_methods.sql')
       sql(
         `update public.site_settings set payment_icons='${JSON.stringify({ visa: 'https://example.invalid/previous-visa.png', keks: 'https://example.invalid/old-keks.png' })}'::jsonb;`,
@@ -129,7 +131,13 @@ try {
               '-- Odobreni cjenik vlasnika.',
             ),
           ),
-        ),
+        ) +
+        '\n' +
+        readFileSync('public/migracije/202611230021_scheduled_package_prices.sql', 'utf8') +
+        '\n' +
+        readFileSync('public/migracije/202611230021_scheduled_package_prices.sql', 'utf8') +
+        '\n' +
+        readFileSync('tests/scheduled-package-prices.sql', 'utf8'),
     ),
   );
   // Dva različita kupona izbjegavaju serijalizaciju samo na retku istog kupona.

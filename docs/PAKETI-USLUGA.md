@@ -2,15 +2,19 @@
 
 U **Administracija → Usluge** uz spremljenu uslugu kliknite **Paketi**. Odaberite **Dodaj paket**, unesite naziv, opis/opseg i cijenu u eurima te razdoblje usluge. Uključite **Kupac bira između paketa ove usluge** i spremite. Za novu uslugu najprije spremite osnovne podatke, zatim dodajte pakete.
 
-Primjer za **Upravljanje i vođenje e-pošte**:
+Odobreni paketi od **1.1.2027.**:
 
-| Paket   | Opis                   | Razdoblje      | Cijena |
-| ------- | ---------------------- | -------------- | ------ |
-| Paket 1 | Jednokratno, 4h tjedno | Jednokratno    | 70 €   |
-| Paket 2 | 5h tjedno              | Tjedni paket   | 90 €   |
-| Paket 3 | Mjesečno upravljanje   | Mjesečni paket | 350 €  |
+| Usluga                        | Paket                                        | Cijena  |
+| ----------------------------- | -------------------------------------------- | ------- |
+| Upravljanje i vođenje e-pošte | Jednokratno, do 4 sata                       | 70 €    |
+| Upravljanje i vođenje e-pošte | Tjedno, 3 sata dnevno, 5 dana                | 90 €    |
+| Upravljanje i vođenje e-pošte | Mjesečno, 4 sata dnevno, ponedjeljak – petak | 350 €   |
+| Online administracija         | Tjedno, 4 sata dnevno, 5 dana (20 sati)      | 300 €   |
+| Online administracija         | Mjesečno, 4 sata dnevno, ponedjeljak – petak | 1.300 € |
 
-To su primjeri za unos, ne unaprijed upisani artikli ili cijene. Svaki paket naplaćuje se jednom za opisani opseg i razdoblje. Oznake „tjedni” i „mjesečni” ne uključuju pretplatu niti automatsku obnovu naplate.
+Mjesečni paketi imaju fiksnu cijenu neovisno o broju radnih dana u mjesecu. Blagdani i drugi neradni dani uređuju se prema dogovoru. Svaki paket naplaćuje se jednom za opisani opseg i razdoblje, bez automatske obnove.
+
+Ove buduće cijene aktiviraju se putem SQL nadogradnje 021 nakon 020; ne unositi ih kao današnje aktivne pakete prije početka valjanosti. [Upute za cjenik i aktivaciju](CIJENE-OD-2027.md).
 
 Kupac na stranici usluge vidi aktivne pakete i dodaje konkretan paket u košaricu. Različiti paketi iste usluge zasebne su stavke; ponovljeno dodavanje istog paketa povećava njegovu količinu. Kupnja kao gost zadržava odabrani paket. Cijena se uvijek provjerava u bazi, a kupon za uslugu vrijedi na njezine odabrane pakete. Pravila 50/50 nasljeđuju se iz usluge i provjeravaju za svaku stavku. POPUST10 i dalje vrijedi samo za prvu narudžbu uz jednokratno kartično plaćanje.
 

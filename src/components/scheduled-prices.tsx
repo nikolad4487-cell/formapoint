@@ -1,3 +1,4 @@
+import type { ApprovedPackage } from '../../seo/package-prices-2027.mjs';
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
@@ -18,6 +19,7 @@ type PriceChange = {
   starts_at: string;
   status: string;
   last_error: string | null;
+  package_plan?: ApprovedPackage[] | null;
 };
 function usePriceSchedule() {
   return useQuery({
@@ -100,7 +102,20 @@ export function ScheduledServicePrices() {
                         {change.service_name}
                         <small style={{ display: 'block' }}>{change.category_name}</small>
                       </td>
-                      <td>{money(change.new_price_cents)}</td>
+                      <td>
+                        {change.package_plan?.length ? (
+                          <ul>
+                            {change.package_plan.map((item) => (
+                              <li key={item.id}>
+                                {item.name}: {money(item.price_cents)}
+                                <small style={{ display: 'block' }}>{item.description}</small>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          money(change.new_price_cents)
+                        )}
+                      </td>
                       <td>{localDate(change.starts_at)}</td>
                       <td>
                         {{
@@ -143,9 +158,19 @@ export function ScheduledServicePrices() {
         title="Otkazati zakazanu cijenu?"
       >
         <p>
-          {cancel?.service_name}: {cancel && money(cancel.new_price_cents)} od{' '}
-          {cancel && localDate(cancel.starts_at)}.
+          {cancel?.service_name}:{' '}
+          {cancel?.package_plan?.length ? 'cjenik paketa' : cancel && money(cancel.new_price_cents)}{' '}
+          od {cancel && localDate(cancel.starts_at)}.
         </p>
+        {cancel?.package_plan?.length ? (
+          <ul>
+            {cancel.package_plan.map((item) => (
+              <li key={item.id}>
+                {item.name}: {money(item.price_cents)}
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <Button
           disabled={busy}
           onClick={async () => {

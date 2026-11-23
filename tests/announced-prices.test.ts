@@ -65,3 +65,44 @@ describe('Najava odobrenog cjenika za 2027.', () => {
     ).not.toContain('Cijena od 1.1.2027.');
   });
 });
+
+it('najava pet paketa prikazuje odobrene cijene i nestaje na početku 2027.', async () => {
+  const { announcedPackages } = await import('../seo/announced-prices.mjs');
+  const { packagePlans2027, monthlyPackageTerms } = await import('../seo/package-prices-2027.mjs');
+  const email = { ...service, id: '958b7acd-8f18-4a93-a723-406c294cefa2' };
+  const admin = { ...service, id: '0433f0e6-54ee-44fd-bbc2-842f492764c4' };
+  expect(announcedPackages(email, before).map((p) => p.price_cents)).toEqual([7000, 9000, 35000]);
+  expect(announcedPackages(admin, before).map((p) => p.price_cents)).toEqual([30000, 130000]);
+  expect(announcedPackages(email, before)[1].description).toContain('ukupno 15 sati');
+  expect(announcedPackages(admin, before)[0].description).toContain('ukupno 20 sati');
+  expect(
+    packagePlans2027
+      .flatMap((plan) => plan.packages)
+      .filter((p) => p.period === 'month')
+      .every((p) => p.description.includes(monthlyPackageTerms)),
+  ).toBe(true);
+  expect(announcedPackages({ ...email, packages_enabled: true }, before)).toHaveLength(3);
+  expect(announcedPackages(email, priceList2027StartsAt)).toEqual([]);
+  expect(announcedPackages({ ...admin, active: false }, before)).toEqual([]);
+  expect(announcedPackages(service, before)).toEqual([]);
+});
+
+it('HTML najava paketa ne objavljuje buduće cijene kao trenutačne ponude', () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(before);
+  const admin = {
+    ...service,
+    id: '0433f0e6-54ee-44fd-bbc2-842f492764c4',
+    category_slug: 'administracija',
+    slug: 'admin',
+    packages_enabled: false,
+    price_cents: 5000,
+  };
+  const page = makePage('/administracija/admin', { services: [admin] });
+  expect(page.body).toContain('Cijene paketa od 1.1.2027.');
+  expect(page.body).toContain('1.300,00');
+  expect(page.body).toContain('Blagdani i drugi neradni dani');
+  expect(
+    (page.schema.find((item) => item['@type'] === 'Service')?.offers as { price: string }).price,
+  ).toBe('50.00');
+});

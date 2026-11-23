@@ -1,3 +1,4 @@
+import { packagePlans2027 } from './package-prices-2027.mjs';
 // Owner-approved price list from migration 020; display only, never checkout pricing.
 export const priceList2027StartsAt = Date.parse('2027-01-01T00:00:00+01:00');
 export const prices2027 = Object.freeze({
@@ -24,4 +25,9 @@ export function announcedPrice(service, now = Date.now()) {
     price / 100,
   );
   return `Cijena od 1.1.2027. ${amount}`;
+}
+
+export function announcedPackages(service, now = Date.now()) {
+  if (now >= priceList2027StartsAt || service.active === false) return [];
+  return packagePlans2027.find((plan) => plan.service_id === service.id)?.packages || [];
 }

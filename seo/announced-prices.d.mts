@@ -5,3 +5,8 @@ export function announcedPrice(
   service: Pick<Service, 'id' | 'slug' | 'category' | 'active' | 'packages_enabled'>,
   now?: number,
 ): string | null;
+
+export function announcedPackages(
+  service: Pick<Service, 'id' | 'active'>,
+  now?: number,
+): import('./package-prices-2027.mjs').ApprovedPackage[];

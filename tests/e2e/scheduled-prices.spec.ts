@@ -93,3 +93,58 @@ test('crvena najava ispod cijene, kupnja po sadašnjoj cijeni i uklanjanje najav
   await page.clock.fastForward(3600000);
   await expect(page.locator('.announced-price')).toHaveCount(0);
 });
+
+test('e-pošta i administracija imaju najavu svih pet budućih paketa i fiksnih mjesečnih cijena', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-12-31T22:00:00Z') });
+  await workspaceFixture(page);
+  const services = [
+    {
+      ...fixtureServices[0],
+      id: '958b7acd-8f18-4a93-a723-406c294cefa2',
+      name: 'Upravljanje i vođenje e-pošte',
+      slug: 'email',
+      category: 'Administracija',
+      category_slug: 'administracija',
+      price_cents: 6000,
+    },
+    {
+      ...fixtureServices[1],
+      id: '0433f0e6-54ee-44fd-bbc2-842f492764c4',
+      name: 'Online administracija',
+      slug: 'admin',
+      category: 'Administracija',
+      category_slug: 'administracija',
+      price_cents: 5000,
+    },
+  ];
+  await page.route('**/rest/v1/services?**', (route) => route.fulfill({ json: services }));
+  await page.goto('/usluge');
+  const email = page
+    .locator('.service-card')
+    .filter({ has: page.getByRole('heading', { name: services[0].name, exact: true }) });
+  const admin = page
+    .locator('.service-card')
+    .filter({ has: page.getByRole('heading', { name: services[1].name, exact: true }) });
+  await expect(email.locator('.announced-price li')).toHaveCount(3);
+  for (const price of ['70,00', '90,00', '350,00'])
+    await expect(email.locator('.announced-price')).toContainText(price);
+  await expect(admin.locator('.announced-price li')).toHaveCount(2);
+  await expect(admin.locator('.announced-price')).toContainText('300,00');
+  await expect(admin.locator('.announced-price')).toContainText('1.300,00');
+  await expect(email.locator('.announced-price')).toContainText(
+    'fiksnu cijenu neovisno o broju radnih dana',
+  );
+  await expect(admin.locator('.announced-price')).toContainText(
+    'Blagdani i drugi neradni dani uređuju se prema dogovoru',
+  );
+  await expect(email.locator('.service-card-price > span')).toContainText('60,00');
+  await expect(admin.locator('.service-card-price > span')).toContainText('50,00');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.goto('/administracija/email');
+  await expect(page.locator('.price-card .announced-price li')).toHaveCount(3);
+  await expect(page.locator('.price-card h2')).toContainText('60,00');
+  await page.clock.fastForward(3600000);
+  await expect(page.locator('.announced-price')).toHaveCount(0);
+});

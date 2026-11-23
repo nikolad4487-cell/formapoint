@@ -2537,3 +2537,14 @@ input[type='file'] {
   min-height: 0;
   flex: 0 0 auto;
 }
+.announced-price p,
+.announced-price li {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  margin: 4px 0;
+}
+.announced-price ul {
+  list-style: disc;
+  padding-left: 18px;
+}

@@ -1,4 +1,5 @@
-import { announcedPrice } from './announced-prices.mjs';
+import { monthlyPackageTerms } from './package-prices-2027.mjs';
+import { announcedPrice, announcedPackages } from './announced-prices.mjs';
 import { buySteps, faqs, legalSlugs, publicPages, servicePreparation } from './content.mjs';
 export const SITE_ORIGIN = 'https://www.formapoint.online';
 export const escapeHtml = (value) =>
@@ -119,6 +120,9 @@ const periods = { one_time: 'Jednokratno', week: 'Tjedni paket', month: 'Mjeseč
 const p = (text) => `<p>${escapeHtml(text)}</p>`;
 const list = (items) => `<ul>${items.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>`;
 const priceNotice = (service) => {
+  const packages = announcedPackages(service);
+  if (packages.length)
+    return `<div class="announced-price"><p>Cijene paketa od 1.1.2027.</p><ul>${packages.map((item) => `<li>${escapeHtml(item.name)} – ${escapeHtml(money(item.price_cents))}</li>`).join('')}</ul><p>${escapeHtml(monthlyPackageTerms)}</p></div>`;
   const label = announcedPrice(service);
   return label ? `<p class="announced-price">${escapeHtml(label)}</p>` : '';
 };
