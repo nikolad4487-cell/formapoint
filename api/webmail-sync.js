@@ -98,14 +98,15 @@ async function forward(config, users, setup = false, includeDelivery = false) {
     .update(timestamp + '\n' + hash)
     .digest('hex');
   let response;
+  const attempts=users.length>1?1:2,timeout=users.length>1?45000:20000;
   // Provisioning and welcome claims are idempotent by verified source UUID.
   // Retry one temporary failure, including a lost response after a committed write.
-  for(let attempt=0;attempt<2;attempt++){
+  for(let attempt=0;attempt<attempts;attempt++){
     try{
       response = await fetch(config.target, {
     method: 'POST',
     redirect: 'error',
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(timeout),
     headers: {
       'Content-Type': 'application/json',
       'X-Webmail-Sync-Timestamp': timestamp,
@@ -114,9 +115,9 @@ async function forward(config, users, setup = false, includeDelivery = false) {
     },
     body,
   });
-      if(![429,500,502,503,504].includes(response.status)||attempt===1)break;
+      if(![429,500,502,503,504].includes(response.status)||attempt===attempts-1)break;
     }catch{
-      if(attempt===1)throw new SyncError(503,'Sandučić trenutačno nije moguće povezati.');
+      if(attempt===attempts-1)throw new SyncError(503,'Sandučić trenutačno nije moguće povezati.');
     }
     await new Promise(resolve=>setTimeout(resolve,500));
   }
