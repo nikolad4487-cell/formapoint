@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../hooks/use-auth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -41,7 +42,50 @@ type DraftPackage = {
   period: string;
   active: boolean;
 };
+type PackageDraft = { rows: DraftPackage[]; enabled: boolean };
+function readPackageDraft(key: string): PackageDraft | null {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (
+      value?.version !== 1 ||
+      typeof value.enabled !== 'boolean' ||
+      !Array.isArray(value.rows) ||
+      value.rows.length > 100
+    )
+      return null;
+    if (
+      !value.rows.every(
+        (row: DraftPackage) =>
+          row &&
+          ['id', 'name', 'description', 'price', 'period'].every(
+            (field) => typeof row[field as keyof DraftPackage] === 'string',
+          ) &&
+          typeof row.active === 'boolean',
+      )
+    )
+      return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+const packageRows = (packages: ServicePackage[]): DraftPackage[] =>
+  packages.map((p) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description || '',
+    price: centsToEuroInput(p.price_cents),
+    period: p.period,
+    active: p.active,
+  }));
 export function ServicePackagesEditor({ service, done }: { service: Service; done: () => void }) {
+  const { session } = useAuth();
+  const draftKey = `fp-package-draft:${session?.user.id || 'visitor'}:${service.id}`;
+  const [draft] = useState(() => readPackageDraft(draftKey));
+  const [dirty, setDirty] = useState(Boolean(draft));
+  const [draftStored, setDraftStored] = useState(Boolean(draft));
+  const [restored, setRestored] = useState(Boolean(draft));
+  const saved = useRef(false);
   const ready = service.packages_enabled !== undefined;
   const cache = useQueryClient();
   const q = useQuery({
@@ -58,26 +102,34 @@ export function ServicePackagesEditor({ service, done }: { service: Service; don
       return data as ServicePackage[];
     },
   });
-  const [rows, setRows] = useState<DraftPackage[]>([]);
-  const [enabled, setEnabled] = useState(service.packages_enabled || false);
+  const [rows, setRows] = useState<DraftPackage[]>(draft?.rows || []);
+  const [enabled, setEnabled] = useState(draft?.enabled ?? service.packages_enabled ?? false);
   const [initialized, setInitialized] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   useEffect(() => {
     if (q.data && !initialized) {
-      setRows(
-        q.data.map((p) => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          price: centsToEuroInput(p.price_cents),
-          period: p.period,
-          active: p.active,
-        })),
-      );
+      if (!draft) setRows(packageRows(q.data));
       setInitialized(true);
     }
-  }, [q.data, initialized]);
+  }, [q.data, initialized, draft]);
+  useEffect(() => {
+    if (!initialized || !dirty || saved.current) return;
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify({ version: 1, rows, enabled }));
+      setDraftStored(true);
+    } catch {
+      setDraftStored(false);
+    }
+  }, [rows, enabled, initialized, dirty, draftKey]);
+  function clearDraft() {
+    try {
+      sessionStorage.removeItem(draftKey);
+    } catch {
+      /* Database save does not depend on browser storage. */
+    }
+  }
+
   if (!ready)
     return (
       <p>
@@ -94,6 +146,7 @@ export function ServicePackagesEditor({ service, done }: { service: Service; don
       </p>
     );
   function update(id: string, values: Partial<DraftPackage>) {
+    setDirty(true);
     setRows((current) => current.map((p) => (p.id === id ? { ...p, ...values } : p)));
   }
   return (
@@ -115,6 +168,8 @@ export function ServicePackagesEditor({ service, done }: { service: Service; don
               active: p.active,
             })),
           });
+          saved.current = true;
+          clearDraft();
           await cache.invalidateQueries({ queryKey: ['services'] });
           await cache.invalidateQueries({ queryKey: ['service-packages', service.id] });
           await cache.invalidateQueries({ queryKey: ['cart'] });
@@ -131,11 +186,43 @@ export function ServicePackagesEditor({ service, done }: { service: Service; don
         Svaki paket ima svoju cijenu. Tjedni i mjesečni paketi naplaćuju se jednom za odabrano
         razdoblje, bez automatske obnove. Pravila 50/50 nasljeđuju se iz usluge.
       </p>
+      {dirty && (
+        <div className="notice" role="status">
+          <div>
+            <p>
+              {restored ? 'Vraćen je nespremljeni nacrt. ' : ''}
+              {draftStored
+                ? 'Unos je sačuvan kao nacrt u ovoj kartici preglednika, ali još nije spremljen u bazu.'
+                : 'Preglednik ne može sačuvati nacrt. Unos još nije spremljen u bazu.'}{' '}
+              Za trajno spremanje kliknite „Spremi pakete”.
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={busy || !initialized || q.isError}
+              onClick={() => {
+                clearDraft();
+                setRows(packageRows(q.data || []));
+                setEnabled(service.packages_enabled || false);
+                setDirty(false);
+                setDraftStored(false);
+                setRestored(false);
+                setError('');
+              }}
+            >
+              Odbaci nacrt
+            </Button>
+          </div>
+        </div>
+      )}
       <label className="checkbox">
         <input
           type="checkbox"
           checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
+          onChange={(e) => {
+            setDirty(true);
+            setEnabled(e.target.checked);
+          }}
           disabled={busy || !initialized}
         />
         Kupac bira između paketa ove usluge
@@ -150,7 +237,11 @@ export function ServicePackagesEditor({ service, done }: { service: Service; don
         </p>
       )}
       {rows.map((p, index) => (
-        <fieldset className="service-package" key={p.id} disabled={busy}>
+        <fieldset
+          className="service-package"
+          key={p.id}
+          disabled={busy || !initialized || q.isError}
+        >
           <legend>Paket {index + 1}</legend>
           <label>
             Naziv paketa
@@ -202,7 +293,10 @@ export function ServicePackagesEditor({ service, done }: { service: Service; don
           <Button
             type="button"
             variant="ghost"
-            onClick={() => setRows((current) => current.filter((row) => row.id !== p.id))}
+            onClick={() => {
+              setDirty(true);
+              setRows((current) => current.filter((row) => row.id !== p.id));
+            }}
           >
             <Trash2 size={16} />
             Ukloni paket
@@ -214,6 +308,7 @@ export function ServicePackagesEditor({ service, done }: { service: Service; don
         variant="outline"
         disabled={busy || !initialized || q.isError}
         onClick={() => {
+          setDirty(true);
           setEnabled(true);
           setRows((current) => [
             ...current,

@@ -121,3 +121,77 @@ test('gost odabrani paket zadržava pri prelasku na kontaktni obrazac', async ({
   await expect(page).toHaveURL(/kupnja-kao-gost\?.*package=b1900000-0000-4000-8000-000000000011/);
   await expect(page.getByRole('heading', { name: 'Kupnja kao gost' })).toBeVisible();
 });
+
+test('nespremljeni paketi prežive zatvaranje, osvježavanje i neuspjelo spremanje', async ({
+  page,
+}) => {
+  const fixture = await packageFixture(page);
+  let reject = true;
+  await page.route('**/rest/v1/rpc/save_service_packages', (route) =>
+    reject
+      ? route.fulfill({
+          status: 400,
+          json: { code: 'P0001', message: 'Spremanje nije uspjelo. Pokušajte ponovno.' },
+        })
+      : route.fallback(),
+  );
+  await page.goto('/admin/usluge');
+  await page.getByRole('button', { name: 'Paketi', exact: true }).click();
+  let dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Dodaj paket' }).click();
+  await dialog.getByLabel('Naziv paketa').fill('Administracija - tjedni paket');
+  await dialog.getByLabel('Cijena paketa (€)').fill('123,45');
+  await dialog.getByLabel('Opis i opseg paketa').fill('Pet sati administrativne podrške.');
+  await dialog.getByLabel('Razdoblje usluge').selectOption('week');
+  await expect(dialog.getByRole('status')).toContainText('još nije spremljen u bazu');
+  await dialog.getByRole('button', { name: 'Zatvori', exact: true }).click();
+  await page.getByRole('button', { name: 'Paketi', exact: true }).click();
+  dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('Cijena paketa (€)')).toHaveValue('123,45');
+  await expect(dialog.getByRole('status')).toContainText('Vraćen je nespremljeni nacrt');
+  await page.reload();
+  await page.getByRole('button', { name: 'Paketi', exact: true }).click();
+  dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('Naziv paketa')).toHaveValue('Administracija - tjedni paket');
+  await expect(dialog.getByLabel('Cijena paketa (€)')).toHaveValue('123,45');
+  await expect(dialog.getByLabel('Razdoblje usluge')).toHaveValue('week');
+  await dialog.getByRole('button', { name: 'Spremi pakete', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Spremanje nije uspjelo');
+  await expect(dialog.getByLabel('Cijena paketa (€)')).toHaveValue('123,45');
+  expect(fixture.saved()).toBeUndefined();
+  reject = false;
+  await dialog.getByRole('button', { name: 'Spremi pakete', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(fixture.saved().p_packages[0]).toMatchObject({
+    name: 'Administracija - tjedni paket',
+    price_cents: 12345,
+    period: 'week',
+  });
+  expect(
+    await page.evaluate(() =>
+      Object.keys(sessionStorage).filter((key) => key.startsWith('fp-package-draft:')),
+    ),
+  ).toEqual([]);
+  await page.getByRole('button', { name: 'Paketi', exact: true }).click();
+  await expect(page.getByRole('dialog').getByLabel('Cijena paketa (€)')).toHaveValue('123,45');
+  await expect(
+    page.getByRole('dialog').getByText('Vraćen je nespremljeni nacrt', { exact: false }),
+  ).toHaveCount(0);
+});
+
+test('administrator može odbaciti nacrt i ponovno učitati spremljene pakete', async ({ page }) => {
+  const fixture = await packageFixture(page);
+  fixture.seed();
+  await page.goto('/admin/usluge');
+  await page.getByRole('button', { name: 'Paketi', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Cijena paketa (€)').fill('999');
+  await dialog.getByRole('button', { name: 'Odbaci nacrt' }).click();
+  await expect(dialog.getByLabel('Cijena paketa (€)')).toHaveValue('350,00');
+  expect(fixture.saved()).toBeUndefined();
+  expect(
+    await page.evaluate(() =>
+      Object.keys(sessionStorage).filter((key) => key.startsWith('fp-package-draft:')),
+    ),
+  ).toEqual([]);
+});

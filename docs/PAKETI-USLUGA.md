@@ -28,3 +28,9 @@ Dok su paketi uključeni, osnovna cijena usluge ne koristi se za kupnju. Isklju�
    ```
 
 Nisu potrebni novi ključevi niti objava Stripe funkcija. Prije SQL nadogradnje postojeće usluge i košarica nastavljaju raditi, a gumb Paketi nudi poveznicu na SQL 019.
+
+## Nacrti i potvrda spremanja
+
+Izmjene paketa automatski se čuvaju kao nespremljeni nacrt u `sessionStorage`, zasebno po administratorskom računu i usluzi. Ponovno otvaranje prozora ili osvježavanje iste kartice vraća unos. To ne objavljuje cijene kupcima: potrebno je kliknuti **Spremi pakete** i pričekati potvrdu uspješnog spremanja. Nacrt se uklanja tek nakon uspješnog odgovora baze ili pritiskom na **Odbaci nacrt**, koji vraća spremljene vrijednosti. Neuspješan zahtjev ostavlja prozor otvoren, prikazuje pogrešku i zadržava unos.
+
+Nacrt traje tijekom sesije te kartice preglednika; ne zamjenjuje spremanje u bazu niti može vratiti podatke izgubljene prije uvođenja ove zaštite. Ako preglednik ne dopušta lokalnu pohranu, obrazac to jasno prikazuje.
