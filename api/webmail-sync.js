@@ -90,7 +90,7 @@ async function authGet(config, path, token) {
   if (!response.ok) throw new SyncError(503, 'Izvor korisnika trenutačno nije dostupan.');
   return response.json();
 }
-async function forward(config, users, setup = false) {
+async function forward(config, users, setup = false, includeDelivery = false) {
   const body = JSON.stringify({ project: config.project, setup, users });
   const timestamp = String(Date.now()),
     hash = createHash('sha256').update(body).digest('hex');
@@ -124,7 +124,7 @@ async function forward(config, users, setup = false) {
   const result = await response.json();
   if (result?.ok !== true || !Array.isArray(result.results))
     throw new SyncError(503, 'Potvrda povezivanja nije dostupna.');
-  return result.results;
+  return includeDelivery ? {results:result.results,welcomes:result.welcomes} : result.results;
 }
 // Server-only operator repair: inspect one named account without exposing Auth keys.
 export async function inspectRegistration(email,apply=false){
@@ -136,7 +136,7 @@ export async function inspectRegistration(email,apply=false){
   if(!Array.isArray(data.users))throw new SyncError(503,'Izvor nije dostupan.');
   const matches=data.users.filter(u=>u.email?.toLowerCase()===email.toLowerCase());
   if(matches.length>1)throw new SyncError(409,'Više izvornih računa.');
-  if(matches.length){const user=matches[0];return {found:true,confirmed:!!user.email_confirmed_at,eligible:!!eligible(user),...(apply&&eligible(user)?{results:await forward(config,[person(user)])}:{})};}
+  if(matches.length){const user=matches[0];return {found:true,confirmed:!!user.email_confirmed_at,eligible:!!eligible(user),...(apply&&eligible(user)?await forward(config,[person(user)],false,true):{})};}
   if(data.users.length<50)return {found:false};
  }
  throw new SyncError(503,'Previše stranica za ovu provjeru.');
