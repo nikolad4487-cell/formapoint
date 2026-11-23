@@ -1,3 +1,4 @@
+import { ChangePassword } from '../components/change-password';
 import { serviceReference } from '../lib/service-links';
 import { saveCatalogService, catalogError } from '../lib/catalog-editor';
 import { useSiteSettings, usePublishedPage } from '../hooks/use-site-settings';
@@ -1531,7 +1532,7 @@ export function NotificationsPage() {
   );
 }
 export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
-  const { session } = useAuth();
+  const { session, webmail, webmailLoading, webmailError, retryWebmail } = useAuth();
   const q = useRows<{
     id: string;
     first_name: string;
@@ -1545,6 +1546,39 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
   return (
     <>
       <PageHeader title="Moj profil" embedded={embedded} />
+      {!session?.user.is_anonymous && (
+        <section className="panel">
+          <h2>Osobni sandučić</h2>
+          {webmailLoading ? (
+            <p>Pripremamo vaš sandučić…</p>
+          ) : webmail ? (
+            <>
+              <p>{webmail.address}</p>
+              <a
+                className="button"
+                href={webmail.loginUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Otvori WebmailHR
+              </a>
+              <p>
+                Za prijavu koristite adresu sandučića i lozinku koju ste postavili za prijavu na
+                FormaPoint.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>{webmailError || 'Sandučić se povezuje nakon potvrde e-mail adrese.'}</p>
+              {webmailError && (
+                <button type="button" onClick={retryWebmail}>
+                  Pokušaj ponovno
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      )}
       <QueryState query={q}>
         {q.data?.[0] && (
           <form
@@ -1657,6 +1691,7 @@ export function ProfilePage({ embedded = false }: { embedded?: boolean }) {
           </form>
         )}
       </QueryState>
+      <ChangePassword />
       <div className="panel">
         <h2>Sigurnost i osobni podaci</h2>
         <p>
