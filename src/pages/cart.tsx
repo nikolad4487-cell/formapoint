@@ -1,3 +1,4 @@
+import { AnnouncedPrice } from '../components/announced-price';
 import { serviceReference } from '../lib/service-links';
 import { usePublicPaymentMethods } from '../hooks/use-payment-methods';
 import { AddToCartButton } from '../components/add-to-cart';
@@ -77,6 +78,7 @@ export function CatalogOrderPage() {
                 <h2>{s.name}</h2>
                 <p>{s.description}</p>
                 <strong>{s.price_cents === null ? 'Prema ponudi' : money(s.price_cents)}</strong>
+                <AnnouncedPrice service={s} />
                 <AddToCartButton service={s} />
               </article>
             ))}

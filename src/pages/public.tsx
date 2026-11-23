@@ -1,3 +1,4 @@
+import { AnnouncedPrice } from '../components/announced-price';
 import { faqs, buySteps } from '../../seo/content.mjs';
 import { ServicePreparation } from '../components/service-preparation';
 import { useSiteSettings } from '../hooks/use-site-settings';
@@ -428,6 +429,7 @@ export function ServiceDetail() {
                 ? 'Cijena prema ponudi'
                 : money(s.price_cents)}
           </h2>
+          <AnnouncedPrice service={s} />
           <p>
             {s.price_cents === null
               ? 'Pošaljite opis zadatka i dobit ćete individualnu ponudu.'

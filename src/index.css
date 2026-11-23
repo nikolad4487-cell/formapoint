@@ -2515,3 +2515,25 @@ input[type='file'] {
 .seo-initial .service-package {
   overflow-wrap: anywhere;
 }
+/* Future prices are informational; checkout keeps the current database price. */
+.announced-price,
+.service-card .announced-price,
+.price-card .announced-price {
+  display: block;
+  color: #b91c1c;
+  text-align: left;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-weight: 600;
+  margin: 6px 0 0;
+}
+.service-card-price {
+  min-width: 0;
+}
+.service-card-footer .service-card-price {
+  flex: 1;
+}
+.seo-initial .announced-price {
+  min-height: 0;
+  flex: 0 0 auto;
+}

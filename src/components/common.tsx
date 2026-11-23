@@ -1,3 +1,4 @@
+import { AnnouncedPrice } from './announced-price';
 import { servicePath } from '../lib/service-links';
 import { AddToCartButton } from './add-to-cart';
 import { useSiteSettings } from '../hooks/use-site-settings';
@@ -111,11 +112,14 @@ export function ServiceCard({ service }: { service: Service }) {
       <h3>{service.name}</h3>
       <p>{service.description}</p>
       <div className="service-card-footer">
-        <span>
-          {service.price_cents === null
-            ? 'Cijena prema ponudi'
-            : `Od ${money(service.price_cents)}`}
-        </span>
+        <div className="service-card-price">
+          <span>
+            {service.price_cents === null
+              ? 'Cijena prema ponudi'
+              : `Od ${money(service.price_cents)}`}
+          </span>
+          <AnnouncedPrice service={service} />
+        </div>
         <Link to={servicePath(service)} aria-label={`Saznaj više: ${service.name}`}>
           Saznaj više <ArrowUpRight size={16} />
         </Link>

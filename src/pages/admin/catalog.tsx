@@ -1,3 +1,4 @@
+import { AnnouncedPrice } from '../../components/announced-price';
 import { ScheduledServicePrices, SchedulePriceEditor } from '../../components/scheduled-prices';
 import { ServicePackagesEditor } from '../../components/service-packages';
 import { DeleteCatalogItem } from '../../components/delete-catalog-item';
@@ -133,6 +134,7 @@ export function CatalogAdmin() {
                                   : s.price_cents === null
                                     ? 'Prema ponudi'
                                     : money(s.price_cents)}
+                                <AnnouncedPrice service={s} />
                               </td>
                               <td>{s.split_enabled ? '100 % ili 50/50' : '100 %'}</td>
                               <td>

@@ -1,3 +1,4 @@
+import { announcedPrice } from './announced-prices.mjs';
 import { buySteps, faqs, legalSlugs, publicPages, servicePreparation } from './content.mjs';
 export const SITE_ORIGIN = 'https://www.formapoint.online';
 export const escapeHtml = (value) =>
@@ -117,13 +118,17 @@ export function cleanPath(input) {
 const periods = { one_time: 'Jednokratno', week: 'Tjedni paket', month: 'Mjesečni paket' };
 const p = (text) => `<p>${escapeHtml(text)}</p>`;
 const list = (items) => `<ul>${items.map((x) => `<li>${escapeHtml(x)}</li>`).join('')}</ul>`;
+const priceNotice = (service) => {
+  const label = announcedPrice(service);
+  return label ? `<p class="announced-price">${escapeHtml(label)}</p>` : '';
+};
 const link = (path, title) => `<a href="${escapeHtml(path)}">${escapeHtml(title)}</a>`;
 const cmsPath = (slug) =>
   Object.hasOwn(publicPages, `/${slug}`) || legalSlugs.includes(slug)
     ? `/${slug}`
     : `/p/${encodeURIComponent(slug)}`;
 function cards(services) {
-  return `<div class="service-grid">${services.map((s) => `<article class="service-card"><h2>${link(servicePath(s), s.name)}</h2>${p(s.description)}${p(s.packages_enabled ? (s.price_cents === null ? 'Paketi trenutačno nisu dostupni.' : `Paketi od ${money(s.price_cents)}`) : s.price_cents === null ? 'Cijena prema individualnoj ponudi.' : money(s.price_cents))}${link(servicePath(s), s.packages_enabled ? 'Odaberite paket' : 'Detalji usluge')}</article>`).join('')}</div>`;
+  return `<div class="service-grid">${services.map((s) => `<article class="service-card"><h2>${link(servicePath(s), s.name)}</h2>${p(s.description)}${p(s.packages_enabled ? (s.price_cents === null ? 'Paketi trenutačno nisu dostupni.' : `Paketi od ${money(s.price_cents)}`) : s.price_cents === null ? 'Cijena prema individualnoj ponudi.' : money(s.price_cents))}${priceNotice(s)}${link(servicePath(s), s.packages_enabled ? 'Odaberite paket' : 'Detalji usluge')}</article>`).join('')}</div>`;
 }
 function faqBody() {
   return faqs
@@ -320,6 +325,7 @@ export function makePage(input, snapshot = {}) {
               ? 'Cijena prema individualnoj ponudi.'
               : money(service.price_cents),
           );
+      base.body += priceNotice(service);
       base.body += `<h2>Što je uključeno</h2>${list(service.included || [])}<h2>Granice usluge</h2>${list(service.excluded || [])}<h2>Što pripremiti prije narudžbe?</h2>${list(servicePreparation(service))}`;
       base.body += p(
         service.delivery_days

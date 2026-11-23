@@ -41,3 +41,9 @@ Katalog i AI pri čitanju dodatno provjeravaju dospjele cijene, a provjera se ra
 Stare narudžbe, ponude, stavke i uplate ne mijenjaju se. Primjena čuva prethodnu cijenu, vrijeme primjene, standardnu povijest cijena i audit. Ponovljeni posao ne stvara novu promjenu. Ponavljanje nadogradnje ne vraća namjerno izbrisane nacrte ili rasporede niti ponovno uključuje otkazane promjene.
 
 Ako je usluga izbrisana ili je u međuvremenu prebačena na pakete, promjena dobiva status **Potrebna provjera**. Osnovni raspored ne prepisuje cijene paketa. Ovo je raspored cijena, bez automatske obnove usluga ili naplate postojećim kupcima.
+
+## Javna najava cjenika
+
+Kartice artikala, detalji usluge, katalog nove narudžbe i administracijski popis prikazuju crveno, lijevo ispod trenutačne cijene, primjerice **Cijena od 1.1.2027. 80,00 €**. Najava se prikazuje i u javnom HTML-u bez JavaScripta. U ponoć po Hrvatskoj se uklanja, uključujući već otvoreni interaktivni prikaz.
+
+Ovo je najava konkretnog odobrenog cjenika za 2027. iz `seo/announced-prices.mjs`, a ne javni pristup privatnom administracijskom rasporedu. Test provjerava podudaranje iznosa za postojeće artikle s nadogradnjom 020. Ako se naknadno mijenja ili otkazuje taj odobreni cjenik, treba uskladiti i javnu najavu; proizvoljne nove zakazane promjene ne objavljuju se automatski. Administracija, paketi i dodatne stranice nemaju najavu bez odobrenih novih cijena. Dodavanje najave ne zahtijeva novu SQL nadogradnju i ne mijenja iznose naplate ili postojećih narudžbi.

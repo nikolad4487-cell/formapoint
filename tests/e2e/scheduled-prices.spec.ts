@@ -63,3 +63,33 @@ test.describe('Zakazane cijene prema vremenu Hrvatske', () => {
     );
   });
 });
+
+test('crvena najava ispod cijene, kupnja po sadašnjoj cijeni i uklanjanje najave u ponoć Hrvatske', async ({
+  page,
+}) => {
+  await page.clock.install({ time: new Date('2026-12-31T22:00:00Z') });
+  await workspaceFixture(page);
+  const service = {
+    ...fixtureServices[0],
+    id: '95d76eb9-11a1-4ab0-a1a7-a5cb133dc002',
+    category_slug: 'dokumenti',
+    price_cents: 6000,
+  };
+  await page.route('**/rest/v1/services?**', (route) => route.fulfill({ json: [service] }));
+  await page.goto('/usluge');
+  const card = page.locator('.service-card').first();
+  const notice = card.locator('.announced-price');
+  await expect(notice).toContainText('Cijena od 1.1.2027. 80,00');
+  await expect(notice).toHaveCSS('color', 'rgb(185, 28, 28)');
+  await expect(notice).toHaveCSS('text-align', 'left');
+  await expect(card.locator('.service-card-price > span')).toContainText('60,00');
+  const currentBounds = await card.locator('.service-card-price > span').boundingBox();
+  const noticeBounds = await notice.boundingBox();
+  expect(noticeBounds!.y).toBeGreaterThan(currentBounds!.y);
+  expect(Math.abs(noticeBounds!.x - currentBounds!.x)).toBeLessThan(2);
+  await page.goto(`/dokumenti/${service.slug}`);
+  await expect(page.locator('.price-card .announced-price')).toContainText('80,00');
+  await expect(page.locator('.price-card h2')).toContainText('60,00');
+  await page.clock.fastForward(3600000);
+  await expect(page.locator('.announced-price')).toHaveCount(0);
+});
